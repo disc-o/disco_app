@@ -14,13 +14,18 @@ import 'package:disco_app/user.dart';
 import 'package:disco_app/data.dart' as data;
 import 'package:http_parser/http_parser.dart';
 import 'package:wifi/wifi.dart';
-import 'package:path_provider/path_provider.dart' as pp;
-import 'package:flutter/services.dart' show rootBundle;
+// import 'package:path_provider/path_provider.dart' as pp;
+// import 'package:flutter/services.dart' show rootBundle;
+import 'package:disco_app/pages/index_page.dart';
 
 Future closeWebServer(Future<AngelHttp> http) async {
   AngelHttp t = await http;
-  t.close();
-  print('Stopped HTTP server');
+  if (t != null) {
+    t.close();
+    print('Stopped HTTP server');
+  } else {
+    print("The server doesn't exist");
+  }
 }
 
 Future<AngelHttp> startWebServer({int port = 3000}) async {
@@ -34,19 +39,20 @@ Future<AngelHttp> startWebServer({int port = 3000}) async {
   await http.startServer('localhost', port);
   print('Started HTTP server at ${http.server.address}:${http.server.port}');
 
+  var htmlType = MediaType('text', 'html', {'charset': 'utf-8'});
 
-  // var view = await rootBundle.loadString('hello.mustache');
-  // final dir = await pp.getApplicationDocumentsDirectory();
-  // final path = dir.path;
-  // final file = File('$path/hello.mustache');
-  // file.writeAsString(view);
-  // app.configure(mustache(Directory(file.path)));
-
-  app.get('/', (req, res)  {
-    // res.render(view)
+  app.get('/', (req, res) {
+    final page = IndexPage(name: 'Yuanhong');
     res
-      ..contentType = MediaType('text', 'html', {'charset': 'utf-8'})
-      ..write('<h1>hello world<h1>');
+      ..contentType = htmlType
+      ..write(new IndexPageComponent(page: page).render());
+  });
+
+  app.get('/name/:name', (req, res) {
+    final page = IndexPage(name: req.params['name']);
+    res
+      ..contentType = htmlType
+      ..write(new IndexPageComponent(page: page).render());
   });
 
   app.group('/auth', (router) {
@@ -56,9 +62,10 @@ Future<AngelHttp> startWebServer({int port = 3000}) async {
   });
 
   app.fallback((req, res) {
-    var authToken = req.headers.value('authorization')?.replaceAll(_rgxBearer, '')?.trim();
+    var authToken =
+        req.headers.value('authorization')?.replaceAll(_rgxBearer, '')?.trim();
 
-    if(authToken==null) {
+    if (authToken == null) {
       throw AngelHttpException.forbidden();
     } else {
       // TODO: The user has a token, now verify it.
@@ -73,10 +80,12 @@ Future<AngelHttp> startWebServer({int port = 3000}) async {
 }
 
 class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
-
   @override
   Future<void> authorizationEndpoint(RequestContext req, ResponseContext res) {
     // TODO: implement authorizationEndpoint
+    res
+      ..contentType = MediaType('text', 'html', {'charset': 'utf-8'})
+      ..write('<h1>This is authorization endpoint<h1>');
     return super.authorizationEndpoint(req, res);
   }
 
