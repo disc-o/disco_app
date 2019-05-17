@@ -3,9 +3,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:disco_app/database_helper.dart';
-import 'package:http_server/http_server.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:angel_framework/angel_framework.dart';
+import 'package:angel_framework/http.dart';
 
 void main() => runApp(MyApp());
 
@@ -127,58 +127,11 @@ class _MyHomePageState extends State<MyHomePage> {
 }
 
 Future _startWebServer() async {
-  print('started');
-  bool foundFile = false;
   runZoned(() {
-    HttpServer.bind('0.0.0.0', 8000).then((server) {
-      print('Server running at: ${server.address.address}');
-      server.transform(HttpBodyHandler()).listen((HttpRequestBody body) async {
-        print('Request URI');
-        switch (body.request.uri.toString()) {
-          case '/upload':
-            {
-              if (body.type != "form") {
-                body.request.response.statusCode = 400;
-                body.request.response.close();
-                return;
-              }
-              for (var key in body.body.keys.toSet()) {
-                if (key == "file") {
-                  foundFile = true;
-                }
-              }
-              if (!foundFile) {
-                body.request.response.statusCode = 400;
-                body.request.response.close();
-                return;
-              }
-              HttpBodyFileUpload data = body.body['file'];
-              // Save file
-              final directory = await getApplicationDocumentsDirectory();
-              File fFile = File('${directory.path}/file');
-              fFile.writeAsBytesSync(data.content);
-              body.request.response.statusCode = 201;
-              body.request.response.close();
-              break;
-            }
-          case '/':
-            {
-              String _content = 'Hello world';
-              body.request.response.statusCode = 200;
-              body.request.response.headers
-                  .set("Content-Type", "text/html; charset=utf-8");
-              body.request.response.write(_content);
-              body.request.response.close();
-              break;
-            }
-          default:
-            {
-              body.request.response.statusCode = 404;
-              body.request.response.write('Not found');
-              body.request.response.close();
-            }
-        }
-      });
-    });
+    var app = Angel();
+    var http = AngelHttp(app);
+    http.startServer('localhost', 3000);
+    print('started');
+    app.get('/', (req, res) => res.write('Hello, world!'));
   }, onError: (e, stackTrace) => print('Oh noes! $e $stackTrace'));
 }

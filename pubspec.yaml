@@ -21,7 +21,6 @@ dependencies:
     sdk: flutter
   sqflite: ^1.0.0
   path_provider: ^0.4.1
-  http_server: ^0.9.8+1
   angel_framework: ^2.0.0
 
   # The following adds the Cupertino Icons font to your application.
