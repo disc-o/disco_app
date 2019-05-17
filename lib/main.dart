@@ -12,7 +12,7 @@ void main() => runApp(MyApp());
 class MyApp extends StatefulWidget {
   @override
   _MyAppState createState() {
-    _startWebServer();
+    // _startWebServer();
     return _MyAppState();
   }
 }
@@ -38,6 +38,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   final dbHelper = DatabaseHelper.instance;
+  Future<AngelHttp> http;
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +50,23 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
+            RaisedButton(
+              onPressed: () {
+                setState(() {
+                  http = _startWebServer();
+                  print(http);
+                });
+                return http;
+              },
+              child: Text('start server'),
+            ),
+            RaisedButton(
+              child: Text('close server'),
+              onPressed: () {
+                // print(http);
+                _closeWebServer(http);
+              },
+            ),
             RaisedButton(
               child: Text(
                 'insert',
@@ -126,12 +144,20 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
-Future _startWebServer() async {
-  runZoned(() {
-    var app = Angel();
-    var http = AngelHttp(app);
-    http.startServer('localhost', 3000);
-    print('started');
-    app.get('/', (req, res) => res.write('Hello, world!'));
-  }, onError: (e, stackTrace) => print('Oh noes! $e $stackTrace'));
+Future _closeWebServer(Future<AngelHttp> http) async {
+  AngelHttp t = await http;
+  t.close();
+  print('closed');
+}
+
+Future<AngelHttp> _startWebServer() async {
+  var app = Angel();
+  var http = AngelHttp(app);
+  await http.startServer('localhost', 3000);
+  print('started');
+  app.get('/', (req, res) => res.write('<p>Hello, world!<p>'));
+  // await http.close();
+  // print('closed');
+  print('returned');
+  return http;
 }
