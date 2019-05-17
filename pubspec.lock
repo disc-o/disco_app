@@ -29,6 +29,13 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.0.3"
+  angel_oauth2:
+    dependency: "direct main"
+    description:
+      name: angel_oauth2
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "2.3.0"
   angel_route:
     dependency: transitive
     description:

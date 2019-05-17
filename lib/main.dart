@@ -1,11 +1,10 @@
 import 'dart:io';
 import 'dart:async';
 
+import 'package:disco_app/web_server.dart';
 import 'package:flutter/material.dart';
 import 'package:disco_app/database_helper.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:angel_framework/angel_framework.dart';
-import 'package:angel_framework/http.dart';
 
 void main() => runApp(MyApp());
 
@@ -21,7 +20,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SQFlite Demo',
+      title: 'Disco App',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
@@ -53,18 +52,18 @@ class _MyHomePageState extends State<MyHomePage> {
             RaisedButton(
               onPressed: () {
                 setState(() {
-                  http = _startWebServer();
+                  http = startWebServer();
                   print(http);
                 });
                 return http;
               },
-              child: Text('start server'),
+              child: Text('Start server'),
             ),
             RaisedButton(
-              child: Text('close server'),
+              child: Text('Close server'),
               onPressed: () {
                 // print(http);
-                _closeWebServer(http);
+                closeWebServer(http);
               },
             ),
             RaisedButton(
@@ -142,22 +141,4 @@ class _MyHomePageState extends State<MyHomePage> {
     final rowsDeleted = await dbHelper.delete(id);
     print('deleted $rowsDeleted row(s): row $id');
   }
-}
-
-Future _closeWebServer(Future<AngelHttp> http) async {
-  AngelHttp t = await http;
-  t.close();
-  print('closed');
-}
-
-Future<AngelHttp> _startWebServer() async {
-  var app = Angel();
-  var http = AngelHttp(app);
-  await http.startServer('localhost', 3000);
-  print('started');
-  app.get('/', (req, res) => res.write('<p>Hello, world!<p>'));
-  // await http.close();
-  // print('closed');
-  print('returned');
-  return http;
 }
