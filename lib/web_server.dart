@@ -17,6 +17,9 @@ import 'package:wifi/wifi.dart';
 // import 'package:flutter/services.dart' show rootBundle;
 import 'package:disco_app/pages/index_page.dart';
 import 'package:disco_app/pages/query_response_page.dart';
+import 'package:disco_app/pages/grant_access_page.dart';
+
+var htmlType = MediaType('text', 'html', {'charset': 'utf-8'});
 
 Future closeWebServer(Future<AngelHttp> http) async {
   AngelHttp t = await http;
@@ -37,43 +40,34 @@ Future<AngelHttp> startWebServer({int port = 3000}) async {
   // code below will print out the LAN address
   // print(await Wifi.ip);
   // use adb forward tcp:3000 tcp:3000 so that you can access localhost:3000 from your computer
+
   await http.startServer('localhost', 3000);
+
   // code below will listen on public network interface
   // await http.startServer(InternetAddress.anyIPv4, 3000);
+
   print('Started HTTP server at ${http.server.address}:${http.server.port}');
 
-  var htmlType = MediaType('text', 'html', {'charset': 'utf-8'});
-
-  app.get('/', (req, res) {
-    final page = IndexPage(name: 'Yuanhong');
-    res
-      ..contentType = htmlType
-      ..write(new IndexPageComponent(page: page).render());
-  });
-
-  app.get('/name/:name', (req, res) {
-    final page = IndexPage(name: req.params['name']);
-    res
-      ..contentType = htmlType
-      ..write(new IndexPageComponent(page: page).render());
-  });
-
   app.get('/auth', (req, res) {
-    var params = req.queryParameters;
-    // print(req.queryParameters);
-    final String response_type = params['response_type'];
-    final String client_id = params['client_id'];
-    final String redirect_url = params['redirect_url'];
-    final page = QueryResponsePage(response_type, client_id, redirect_url);
-    res
-      ..contentType = htmlType
-      ..write(QueryResponsePageComponent(page).render());
+    authServer.authorizationEndpoint(req, res);
   });
 
-  app.group('/auth', (router) {
-    router
-      ..get('/authorize', authServer.authorizationEndpoint)
-      ..post('/token', authServer.tokenEndpoint);
+  // app.group('/auth', (router) {
+  //   router
+  //     ..get('/authorize', authServer.authorizationEndpoint)
+  //     ..post('/token', authServer.tokenEndpoint);
+  // });
+
+  app.post('/signin', (req, res) async {
+    await req.parseBody();
+    Map body = req.bodyAsMap;
+    var username = body['username'];
+    var password = body['password'];
+    var client_id = body['client_id'];
+    var redirect_url = body['redirect_url'];
+    print(body['grant_type']);
+    print(req.headers.value('grant_type'));
+    // authServer.tokenEndpoint(req, res);
   });
 
   app.fallback((req, res) {
@@ -98,31 +92,17 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
   @override
   Future<void> authorizationEndpoint(RequestContext req, ResponseContext res) {
     // TODO: implement authorizationEndpoint
+    print('Hit: authorizationEndpoint');
+    var params = req.queryParameters;
+    // final String response_type = params['response_type'];
+    final String client_id = params['client_id'];
+    final String redirect_uri = params['redirect_uri'];
+    final page = GrantAccessPage(client_id, redirect_uri);
     res
-      ..contentType = MediaType('text', 'html', {'charset': 'utf-8'})
-      ..write('<h1>This is authorization endpoint<h1>');
+      ..contentType = htmlType
+      ..write(GrantAccessPageComponent(page).render());
+    // res..write({'key': 'value'});
     return super.authorizationEndpoint(req, res);
-  }
-
-  @override
-  Future tokenEndpoint(RequestContext req, ResponseContext res) {
-    // TODO: implement tokenEndpoint
-    return super.tokenEndpoint(req, res);
-  }
-
-  @override
-  FutureOr<Client> findClient(String clientId) {
-    for (var c in data.clients) {
-      if (c.id == clientId) {
-        return c;
-      }
-    }
-    return null;
-  }
-
-  @override
-  FutureOr<bool> verifyClient(Client client, String clientSecret) {
-    return client.name == clientSecret;
   }
 
   @override
@@ -135,9 +115,35 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       ResponseContext res,
       bool implicit) {
     // TODO: implement requestAuthorizationCode
-    throw UnimplementedError();
-    return super.requestAuthorizationCode(
-        client, redirectUri, scopes, state, req, res, implicit);
+
+    print('Hit: requestAuthorizationCode');
+
+    // throw UnimplementedError();
+    // return super.requestAuthorizationCode(
+    //     client, redirectUri, scopes, state, req, res, implicit);
+  }
+
+  @override
+  Future tokenEndpoint(RequestContext req, ResponseContext res) {
+    // TODO: implement tokenEndpoint
+    return super.tokenEndpoint(req, res);
+  }
+
+  @override
+  FutureOr<Client> findClient(String clientId) {
+    // for (var c in data.clients) {
+    //   if (c.id == clientId) {
+    //     return c;
+    //   }
+    // }
+    // return null;
+    return Client(id: 'asd', name: 'name');
+  }
+
+  @override
+  FutureOr<bool> verifyClient(Client client, String clientSecret) {
+    return true;
+    // return client.name == clientSecret;
   }
 
   @override
