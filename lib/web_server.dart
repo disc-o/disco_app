@@ -2,7 +2,6 @@ export 'package:angel_framework/angel_framework.dart';
 export 'package:angel_framework/http.dart';
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:angel_framework/angel_framework.dart';
@@ -17,6 +16,7 @@ import 'package:wifi/wifi.dart';
 // import 'package:path_provider/path_provider.dart' as pp;
 // import 'package:flutter/services.dart' show rootBundle;
 import 'package:disco_app/pages/index_page.dart';
+import 'package:disco_app/pages/query_response_page.dart';
 
 Future closeWebServer(Future<AngelHttp> http) async {
   AngelHttp t = await http;
@@ -34,9 +34,12 @@ Future<AngelHttp> startWebServer({int port = 3000}) async {
   var _rgxBearer = RegExp(r'^[Bb]earer ([^\n\s]+)$');
   var http = AngelHttp(app);
 
-  print(await Wifi.ip);
-
-  await http.startServer('localhost', port);
+  // code below will print out the LAN address
+  // print(await Wifi.ip);
+  // use adb forward tcp:3000 tcp:3000 so that you can access localhost:3000 from your computer
+  await http.startServer('localhost', 3000);
+  // code below will listen on public network interface
+  // await http.startServer(InternetAddress.anyIPv4, 3000);
   print('Started HTTP server at ${http.server.address}:${http.server.port}');
 
   var htmlType = MediaType('text', 'html', {'charset': 'utf-8'});
@@ -53,6 +56,18 @@ Future<AngelHttp> startWebServer({int port = 3000}) async {
     res
       ..contentType = htmlType
       ..write(new IndexPageComponent(page: page).render());
+  });
+
+  app.get('/auth', (req, res) {
+    var params = req.queryParameters;
+    // print(req.queryParameters);
+    final String response_type = params['response_type'];
+    final String client_id = params['client_id'];
+    final String redirect_url = params['redirect_url'];
+    final page = QueryResponsePage(response_type, client_id, redirect_url);
+    res
+      ..contentType = htmlType
+      ..write(QueryResponsePageComponent(page).render());
   });
 
   app.group('/auth', (router) {
