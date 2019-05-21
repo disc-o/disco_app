@@ -49,7 +49,11 @@ Future<AngelHttp> startWebServer({int port = 3000}) async {
   print('Started HTTP server at ${http.server.address}:${http.server.port}');
 
   app.get('/auth', (req, res) {
-    authServer.authorizationEndpoint(req, res);
+    try {
+      authServer.authorizationEndpoint(req, res);
+    } catch (e) {
+      print(e);
+    }
   });
 
   // app.group('/auth', (router) {
@@ -59,15 +63,9 @@ Future<AngelHttp> startWebServer({int port = 3000}) async {
   // });
 
   app.post('/signin', (req, res) async {
-    await req.parseBody();
-    Map body = req.bodyAsMap;
-    var username = body['username'];
-    var password = body['password'];
-    var client_id = body['client_id'];
-    var redirect_url = body['redirect_url'];
-    print(body['grant_type']);
-    print(req.headers.value('grant_type'));
-    // authServer.tokenEndpoint(req, res);
+    // await req.parseBody();
+    // print(req.headers.value('grant_type'));
+    authServer.tokenEndpoint(req, res);
   });
 
   app.fallback((req, res) {
@@ -90,7 +88,8 @@ Future<AngelHttp> startWebServer({int port = 3000}) async {
 
 class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
   @override
-  Future<void> authorizationEndpoint(RequestContext req, ResponseContext res) {
+  Future<void> authorizationEndpoint(
+      RequestContext req, ResponseContext res) async {
     // TODO: implement authorizationEndpoint
     print('Hit: authorizationEndpoint');
     var params = req.queryParameters;
@@ -113,7 +112,7 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       String state,
       RequestContext req,
       ResponseContext res,
-      bool implicit) {
+      bool implicit) async {
     // TODO: implement requestAuthorizationCode
 
     print('Hit: requestAuthorizationCode');
@@ -124,26 +123,25 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
   }
 
   @override
-  Future tokenEndpoint(RequestContext req, ResponseContext res) {
+  Future tokenEndpoint(RequestContext req, ResponseContext res) async {
     // TODO: implement tokenEndpoint
-    return super.tokenEndpoint(req, res);
+    print('Hit: tokenEndpoint');
+    try {
+      return super.tokenEndpoint(req, res);
+    } catch (e) {
+      print(e);
+    }
   }
 
   @override
-  FutureOr<Client> findClient(String clientId) {
-    // for (var c in data.clients) {
-    //   if (c.id == clientId) {
-    //     return c;
-    //   }
-    // }
-    // return null;
-    return Client(id: 'asd', name: 'name');
-  }
-
-  @override
-  FutureOr<bool> verifyClient(Client client, String clientSecret) {
-    return true;
-    // return client.name == clientSecret;
+  FutureOr<oauth2.AuthorizationTokenResponse> exchangeDeviceCodeForToken(
+      Client client,
+      String deviceCode,
+      String state,
+      RequestContext req,
+      ResponseContext res) async {
+    // TODO: implement exchangeDeviceCodeForToken
+    return oauth2.AuthorizationTokenResponse('asd');
   }
 
   @override
@@ -152,10 +150,19 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       String authCode,
       String redirectUri,
       RequestContext req,
-      ResponseContext res) {
+      ResponseContext res) async {
     // TODO: implement exchangeAuthorizationCodeForToken
-    throw UnimplementedError();
-    return super.exchangeAuthorizationCodeForToken(
-        client, authCode, redirectUri, req, res);
+    return oauth2.AuthorizationTokenResponse('asd');
+  }
+
+  @override
+  FutureOr<Client> findClient(String clientId) async {
+    // TODO: implement findClient
+    return Client(id: clientId, name: 'myClient');
+  }
+
+  @override
+  FutureOr<bool> verifyClient(Client client, String clientSecret) async {
+    return true;
   }
 }

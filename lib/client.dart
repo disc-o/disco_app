@@ -3,4 +3,9 @@ class Client {
   String name;
 
   Client({this.id, this.name});
+
+  @override
+  String toString() {
+    return '[Client] ${id} ${name}';
+  }
 }
