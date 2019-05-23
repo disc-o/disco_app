@@ -170,4 +170,10 @@ class DatabaseHelper {
     return Sqflite.firstIntValue(
         await db.rawQuery('SELECT COUNT(*) FROM $clientTable'));
   }
+
+  Future clearTables() async {
+    Database db = await instance.database;
+    await db.execute('DELETE FROM $clientTable');
+    await db.execute('DELETE FROM $tokenTable');
+  }
 }

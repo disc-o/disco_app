@@ -74,6 +74,47 @@ class _DbPageState extends State<DbPage>
                       });
                 }
               },
+            ),
+            MaterialButton(
+              color: Colors.greenAccent,
+              child: Text(
+                'Add dummy entry',
+                style: TextStyle(color: Colors.black),
+              ),
+              onPressed: () async {
+                try {
+                  await db.DatabaseHelper.instance
+                      .insertClient('0', 'client0', 'secret', false);
+                } catch (e) {
+                  showDialog(
+                      context: context,
+                      builder: (context) {
+                        return AlertDialog(
+                          content: Text(e.toString()),
+                        );
+                      });
+                }
+              },
+            ),
+            MaterialButton(
+              color: Colors.redAccent,
+              child: Text(
+                'Clear tables',
+                style: TextStyle(color: Colors.white),
+              ),
+              onPressed: () async {
+                try {
+                  await db.DatabaseHelper.instance.clearTables();
+                } catch (e) {
+                  showDialog(
+                      context: context,
+                      builder: (context) {
+                        return AlertDialog(
+                          content: Text(e.toString()),
+                        );
+                      });
+                }
+              },
             )
           ],
         ),
