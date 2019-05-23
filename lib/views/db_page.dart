@@ -43,8 +43,36 @@ class _DbPageState extends State<DbPage>
               ),
               onPressed: () async {
                 var database = await db.DatabaseHelper.instance.database;
-                List<Map<String, dynamic>> res = await database.rawQuery(_rawQuery);
-                print(res);
+                try {
+                  List<Map<String, dynamic>> res =
+                      await database.rawQuery(_rawQuery);
+                  drawer.openDrawer(context, [
+                    Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: new Text(
+                        "Some Heading Text",
+                        style: new TextStyle(
+                            fontSize: 28.0,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 1,
+                      child: SingleChildScrollView(
+                        child: Text(res.toString()),
+                      ),
+                    ),
+                  ]);
+                } catch (e) {
+                  showDialog(
+                      context: context,
+                      builder: (context) {
+                        return AlertDialog(
+                          content: Text(e.toString()),
+                        );
+                      });
+                }
               },
             )
           ],

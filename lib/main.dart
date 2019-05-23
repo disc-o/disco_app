@@ -35,8 +35,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   var _currentIndex = 0;
   var _appBarTitle = 'KeyGen';
-  final _pages = [KeyPage(), ServerPage()];
-  final _titles = ['KeyGen', 'Server'];
+  final _pages = [KeyPage(), ServerPage(), ClientPage()];
+  final _titles = ['KeyGen', 'Server', 'Client'];
 
   BottomNavigationBarItem _navBarItem(IconData icon, String title) {
     return BottomNavigationBarItem(
@@ -94,6 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
           items: [
             _navBarItem(Icons.vpn_key, 'Key'),
             _navBarItem(Icons.network_check, 'Server'),
+            _navBarItem(Icons.bookmark, 'Client'),
           ],
         ),
         body: PageView(
