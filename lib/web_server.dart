@@ -120,10 +120,13 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
   BuildContext context; // for notifying the user
   _AuthServer(this.context);
 
-  FutureOr<bool> invokeUserToAcceptClient(Client client) async {
-    // print(await verify.openVerificationDrawer(
-    //     context, client.name, client.publicKey));
-    return true;
+  FutureOr<bool> invokeUserToReviewScope(
+      Client client, Iterable<String> scopes) async {
+    try {
+      return await openScopeReviewDrawer(context, client, scopes) == true;
+    } catch (e) {
+      return false;
+    }
   }
 
   Future<void> registerNewClient(
@@ -140,11 +143,13 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       bool isCertified = await checkCertificate(req);
       await req.parseBody();
       var publicKey = req.bodyAsMap['public_key'];
-      bool accepted = await openVerificationDrawer(
+      bool accepted = await openRegisterVerificationDrawer(
           context, clientName, isCertified, isTrusted);
       if (accepted) {
+        String saltedPassword = util.addSalt(clientSecret);
+        // print(util.matchedPassword(clientSecret, saltedPassword));
         db.DatabaseHelper.instance
-            .insertClient(clientId, clientName, clientSecret, isTrusted);
+            .insertClient(clientId, clientName, saltedPassword, isTrusted);
       } else {
         throw AuthorizationException(ErrorResponse(
           ErrorResponse.unauthorizedClient,
@@ -160,6 +165,7 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
   }
 
   FutureOr<bool> checkCertificate(RequestContext req) async {
+    // TODO: Implement certificate check
     return true;
   }
 
@@ -174,23 +180,34 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       bool implicit) async {
     if (implicit) {
       // First verify the identity of client requesting for token
-      // var clientSecret = await _getParam(req, 'client_secret', state);
-      // if (await invokeUserToAcceptClient(client)) {
-      //   var token = util.generateCryptoRandomString();
-      //   await db.DatabaseHelper.instance.insertToTokenTable(
-      //       token, client.id, scopes.reduce((a, b) => a + b), expiresIn);
-      //   res
-      //     ..redirect(super.completeImplicitGrant(
-      //         oauth2.AuthorizationTokenResponse(token,
-      //             expiresIn: expiresIn, scope: scopes),
-      //         Uri(path: redirectUri)));
-      // } else {
-      //   throw oauth2.AuthorizationException(
-      //     oauth2.ErrorResponse(oauth2.ErrorResponse.unauthorizedClient,
-      //         'Invalid client secret', state),
-      //     statusCode: 404,
-      //   );
-      // }
+      var clientSecret = await _getParam(req, 'client_secret', state);
+      print(clientSecret);
+      print(client.secret);
+      if (!util.matchedPassword(clientSecret, client.secret)) {
+        throw oauth2.AuthorizationException(
+          oauth2.ErrorResponse(oauth2.ErrorResponse.unauthorizedClient,
+              'Invalid client secret', state),
+          statusCode: 404,
+        );
+      } else {
+        // Now that the request has the correct client_secret, checking its certificate is not necessary.
+        if (await invokeUserToReviewScope(client, scopes)) {
+          var token = util.generateCryptoRandomString();
+          await db.DatabaseHelper.instance.insertToTokenTable(
+              token, client.id, scopes.reduce((a, b) => a + b), expiresIn);
+          res
+            ..redirect(super.completeImplicitGrant(
+                oauth2.AuthorizationTokenResponse(token,
+                    expiresIn: expiresIn, scope: scopes),
+                Uri(path: redirectUri)));
+        } else {
+          throw oauth2.AuthorizationException(
+            oauth2.ErrorResponse(oauth2.ErrorResponse.unauthorizedClient,
+                'User rejected your request', state),
+            statusCode: 404,
+          );
+        }
+      }
     } else {
       // According to https://www.oauth.com/oauth2-servers/access-tokens/access-token-response/
       // the error response should be one of:

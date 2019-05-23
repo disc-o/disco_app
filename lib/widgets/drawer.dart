@@ -1,7 +1,8 @@
+import 'package:disco_app/client.dart';
 import 'package:flutter/material.dart';
 import 'package:groovin_widgets/modal_drawer_handle.dart';
 
-List<Widget> _verificationContent(
+List<Widget> _registerVerificationContent(
     BuildContext context, String clientName, bool isCertified, bool isTrusted) {
   return [
     ListTile(
@@ -43,10 +44,53 @@ List<Widget> _verificationContent(
   ];
 }
 
-Future openVerificationDrawer(
+Future openRegisterVerificationDrawer(
     BuildContext context, String clientName, bool isCertified, bool isTrusted) {
   return openDrawer(
-      context, _verificationContent(context, clientName, isCertified, isTrusted));
+      context,
+      _registerVerificationContent(
+          context, clientName, isCertified, isTrusted));
+}
+
+List<Widget> _scopeReviewContent(
+    BuildContext context, Client client, Iterable<String> scopes) {
+  return [
+    ListTile(
+      leading: Icon(Icons.call_received),
+      title: Text(
+        'Requesting client',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
+      subtitle: Text(client.name),
+    ),
+    ListTile(
+      leading: Icon(Icons.power),
+      title: Text(
+        'Scope',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
+      subtitle: Text(scopes.reduce((a, b) => a + b)),
+    ),
+    MaterialButton(
+      child: Text('Reject'),
+      color: Colors.redAccent,
+      onPressed: () {
+        Navigator.pop(context, false);
+      },
+    ),
+    MaterialButton(
+      child: Text('Approve'),
+      color: Colors.blueAccent,
+      onPressed: () {
+        Navigator.pop(context, true);
+      },
+    )
+  ];
+}
+
+Future openScopeReviewDrawer(
+    BuildContext context, Client client, Iterable<String> scopes) {
+  return openDrawer(context, _scopeReviewContent(context, client, scopes));
 }
 
 Future openDrawer(BuildContext context, List<Widget> content) {

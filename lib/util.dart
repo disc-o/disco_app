@@ -2,7 +2,6 @@ export 'package:pointycastle/api.dart';
 
 import 'dart:math';
 
-
 import 'package:convert/convert.dart' as conv;
 
 import 'package:encrypt/encrypt.dart';
@@ -18,6 +17,12 @@ String generateCryptoRandomString({int length = 32}) {
 bool matchedPassword(String secret, String saltedSecret) {
   var c = Crypt(saltedSecret);
   return c.match(secret);
+}
+
+String addSalt(String password) {
+  return Crypt.sha256(password,
+          rounds: 10000, salt: generateCryptoRandomString())
+      .toString();
 }
 
 main(List<String> args) async {
@@ -37,11 +42,14 @@ main(List<String> args) async {
 
   // Hash
   // Use a crypto-random salt
-  var c1 = new Crypt.sha256('password', rounds: 10000, salt: "mysalt");
-  var c2 = new Crypt.sha256('password');
-  print(c1.match('password'));
-  print(c2.match('password'));
-  var c3 = new Crypt(c1.toString());
-  print(c3.match('password'));
-  
+  // var c1 = new Crypt.sha256('password', rounds: 10000, salt: "mysalt");
+  // var c2 = new Crypt.sha256('password');
+  // print(c1.match('password'));
+  // print(c2.match('password'));
+  // var c3 = new Crypt(c1.toString());
+  // print(c3.match('password'));
+
+  // print(matchedPassword('secret', '\$5\$rounds=10000\$bea0cbaf10981ab4\$KTCxUdA9bPWMo4hw3iyq51nTUCchViVr.yQGbU/yZ6.'));
+  String saltedPassword = addSalt('secret');
+  print(matchedPassword('secret', saltedPassword));
 }

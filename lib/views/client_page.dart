@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:disco_app/widgets/drawer.dart';
 import 'package:disco_app/database_helper.dart' as db;
 
 class _ClientData {
