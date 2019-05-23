@@ -72,3 +72,4 @@
 # disco package
 
 disco/
+.env

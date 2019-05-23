@@ -2,24 +2,48 @@ export 'package:angel_framework/angel_framework.dart';
 export 'package:angel_framework/http.dart';
 
 import 'dart:async';
-import 'dart:io';
 
 import 'package:angel_framework/angel_framework.dart';
 import 'package:angel_framework/http.dart';
 import 'package:angel_oauth2/angel_oauth2.dart' as oauth2;
-// import 'package:angel_mustache/angel_mustache.dart';
+import 'package:angel_oauth2/angel_oauth2.dart';
 import 'package:disco_app/client.dart';
 import 'package:disco_app/user.dart';
-import 'package:disco_app/data.dart' as data;
+import 'package:flutter/cupertino.dart';
 import 'package:http_parser/http_parser.dart';
-import 'package:wifi/wifi.dart';
-// import 'package:path_provider/path_provider.dart' as pp;
-// import 'package:flutter/services.dart' show rootBundle;
-import 'package:disco_app/pages/index_page.dart';
-import 'package:disco_app/pages/query_response_page.dart';
-import 'package:disco_app/pages/grant_access_page.dart';
+import 'package:disco_app/database_helper.dart' as db;
+import 'package:disco_app/util.dart' as util;
+// import 'package:disco_app/widgets/verification_drawer.dart' as verify;
+
+class MyServer {}
 
 var htmlType = MediaType('text', 'html', {'charset': 'utf-8'});
+
+Future<String> _getParam(RequestContext req, String name, String state,
+    {bool body = false, bool throwIfEmpty = true}) async {
+  Map<String, dynamic> data;
+
+  if (body == true) {
+    data = await req.parseBody().then((_) => req.bodyAsMap);
+  } else {
+    data = req.queryParameters;
+  }
+
+  var value = data.containsKey(name) ? data[name]?.toString() : null;
+
+  if (value?.isNotEmpty != true && throwIfEmpty) {
+    throw AuthorizationException(
+      ErrorResponse(
+        ErrorResponse.invalidRequest,
+        'Missing required parameter "$name".',
+        state,
+      ),
+      statusCode: 400,
+    );
+  }
+
+  return value;
+}
 
 Future closeWebServer(Future<AngelHttp> http) async {
   AngelHttp t = await http;
@@ -31,41 +55,42 @@ Future closeWebServer(Future<AngelHttp> http) async {
   }
 }
 
-Future<AngelHttp> startWebServer({int port = 3000}) async {
+// Future<AngelHttp> startWebServerWithContext(BuildContext context,
+//     {int port = 3000}) async {
+//   print(await cp.openVerificationDrawer(context, 'asd', 'asd'));
+//   return await startWebServer(context, port: port);
+// }
+
+Future<AngelHttp> startWebServer(BuildContext context,
+    {int port = 3000}) async {
   var app = Angel();
-  var authServer = _AuthServer();
+  var authServer = _AuthServer(context);
   var _rgxBearer = RegExp(r'^[Bb]earer ([^\n\s]+)$');
   var http = AngelHttp(app);
 
-  // code below will print out the LAN address
-  // print(await Wifi.ip);
-  // use adb forward tcp:3000 tcp:3000 so that you can access localhost:3000 from your computer
+  try {
+    // code below will print out the LAN address
+    // print(await Wifi.ip);
+    // use adb forward tcp:3000 tcp:3000 so that you can access localhost:3000 from your computer
 
-  await http.startServer('localhost', 3000);
+    await http.startServer('localhost', 3000);
 
-  // code below will listen on public network interface
-  // await http.startServer(InternetAddress.anyIPv4, 3000);
+    // code below will listen on public network interface
+    // await http.startServer(InternetAddress.anyIPv4, 3000);
 
-  print('Started HTTP server at ${http.server.address}:${http.server.port}');
+    print('Started HTTP server at ${http.server.address}:${http.server.port}');
+  } catch (e) {
+    print(e);
+  }
 
-  app.get('/auth', (req, res) {
-    try {
-      authServer.authorizationEndpoint(req, res);
-    } catch (e) {
-      print(e);
-    }
-  });
-
-  // app.group('/auth', (router) {
-  //   router
-  //     ..get('/authorize', authServer.authorizationEndpoint)
-  //     ..post('/token', authServer.tokenEndpoint);
-  // });
-
-  app.post('/signin', (req, res) async {
-    // await req.parseBody();
-    // print(req.headers.value('grant_type'));
-    authServer.tokenEndpoint(req, res);
+  app.group('/auth', (router) async {
+    router
+      ..get('/authorize', (req, res) async {
+        await authServer.authorizationEndpoint(req, res);
+      })
+      ..post('/token', (req, res) async {
+        await authServer.tokenEndpoint(req, res);
+      });
   });
 
   app.fallback((req, res) {
@@ -87,21 +112,14 @@ Future<AngelHttp> startWebServer({int port = 3000}) async {
 }
 
 class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
-  @override
-  Future<void> authorizationEndpoint(
-      RequestContext req, ResponseContext res) async {
-    // TODO: implement authorizationEndpoint
-    print('Hit: authorizationEndpoint');
-    var params = req.queryParameters;
-    // final String response_type = params['response_type'];
-    final String client_id = params['client_id'];
-    final String redirect_uri = params['redirect_uri'];
-    final page = GrantAccessPage(client_id, redirect_uri);
-    res
-      ..contentType = htmlType
-      ..write(GrantAccessPageComponent(page).render());
-    // res..write({'key': 'value'});
-    return super.authorizationEndpoint(req, res);
+  int expiresIn = 3600;
+  BuildContext context; // for notifying the user
+  _AuthServer(this.context);
+
+  FutureOr<bool> invokeUserToAcceptClient(Client client) async {
+    // print(await verify.openVerificationDrawer(
+    //     context, client.name, client.publicKey));
+    return true;
   }
 
   @override
@@ -113,56 +131,76 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       RequestContext req,
       ResponseContext res,
       bool implicit) async {
-    // TODO: implement requestAuthorizationCode
-
-    print('Hit: requestAuthorizationCode');
-
-    // throw UnimplementedError();
-    // return super.requestAuthorizationCode(
-    //     client, redirectUri, scopes, state, req, res, implicit);
-  }
-
-  @override
-  Future tokenEndpoint(RequestContext req, ResponseContext res) async {
-    // TODO: implement tokenEndpoint
-    print('Hit: tokenEndpoint');
-    try {
-      return super.tokenEndpoint(req, res);
-    } catch (e) {
-      print(e);
+    if (implicit) {
+      // First verify the identity of client requesting for token
+      // var clientSecret = await _getParam(req, 'client_secret', state);
+      // if (await invokeUserToAcceptClient(client)) {
+      //   var token = util.generateCryptoRandomString();
+      //   await db.DatabaseHelper.instance.insertToTokenTable(
+      //       token, client.id, scopes.reduce((a, b) => a + b), expiresIn);
+      //   res
+      //     ..redirect(super.completeImplicitGrant(
+      //         oauth2.AuthorizationTokenResponse(token,
+      //             expiresIn: expiresIn, scope: scopes),
+      //         Uri(path: redirectUri)));
+      // } else {
+      //   throw oauth2.AuthorizationException(
+      //     oauth2.ErrorResponse(oauth2.ErrorResponse.unauthorizedClient,
+      //         'Invalid client secret', state),
+      //     statusCode: 404,
+      //   );
+      // }
+    } else {
+      // According to https://www.oauth.com/oauth2-servers/access-tokens/access-token-response/
+      // the error response should be one of:
+      // invalid_request, invalid_client, invalid_grant, invalid_scope, unauthorized_client, unsupported_grant_type
+      throw AuthorizationException(
+        ErrorResponse(
+          oauth2.ErrorResponse.unsupportedResponseType,
+          'Only implicit auth method is supported.',
+          state,
+        ),
+        statusCode: 500,
+      );
     }
   }
 
   @override
-  FutureOr<oauth2.AuthorizationTokenResponse> exchangeDeviceCodeForToken(
-      Client client,
-      String deviceCode,
-      String state,
-      RequestContext req,
-      ResponseContext res) async {
-    // TODO: implement exchangeDeviceCodeForToken
-    return oauth2.AuthorizationTokenResponse('asd');
-  }
-
-  @override
-  FutureOr<oauth2.AuthorizationTokenResponse> exchangeAuthorizationCodeForToken(
-      Client client,
-      String authCode,
-      String redirectUri,
-      RequestContext req,
-      ResponseContext res) async {
-    // TODO: implement exchangeAuthorizationCodeForToken
-    return oauth2.AuthorizationTokenResponse('asd');
-  }
-
-  @override
   FutureOr<Client> findClient(String clientId) async {
-    // TODO: implement findClient
-    return Client(id: clientId, name: 'myClient');
+    // var list =
+    //     await db.DatabaseHelper.instance.selectClientByClientId(clientId);
+    // if (list.length != 1) {
+    //   throw oauth2.AuthorizationException(
+    //     oauth2.ErrorResponse(
+    //         oauth2.ErrorResponse.unauthorizedClient, 'Invalid client', ''),
+    //     statusCode: 404,
+    //   );
+    // } else {
+    //   var res = list[0];
+    //   return Client(
+    //       id: res['client_id'],
+    //       name: res['client_name'],
+    //       secret: res['client_secret'],
+    //       isTrusted: res['is_trusted'] == 1,
+    //       publicKey: res['public_key'] ?? '');
+    // }
+    return Client(id: '0', name: 'client', secret: 'secret', isTrusted: false, publicKey: 'key');
   }
 
   @override
   FutureOr<bool> verifyClient(Client client, String clientSecret) async {
+    // var list =
+    //     await db.DatabaseHelper.instance.selectClientByClientId(client.id);
+    // if (list.length != 1) {
+    //   throw oauth2.AuthorizationException(
+    //     oauth2.ErrorResponse(
+    //         oauth2.ErrorResponse.unauthorizedClient, 'Invalid client', ''),
+    //     statusCode: 404,
+    //   );
+    // } else {
+    //   var saltedSecret = list[0]['client_secret'];
+    //   return util.matchedPassword(clientSecret, saltedSecret);
+    // }
     return true;
   }
 }

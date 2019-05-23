@@ -19,13 +19,18 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  sqflite: ^1.0.0
+  sqflite: ^1.1.5
   path_provider: ^0.4.1
   angel_framework: ^2.0.0-alpha
   angel_oauth2: ^2.0.0
   # angel_mustache: ^2.0.0
   wifi: ^0.1.5
   stencil: ^2.1.6
+  encrypt: ^3.0.0
+  crypt: ^1.0.7
+  pointycastle: ^1.0.1
+  flutter_dotenv: ^2.0.1
+  groovin_widgets: ^1.4.2
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
