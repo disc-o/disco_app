@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:groovin_widgets/modal_drawer_handle.dart';
 
 List<Widget> _verificationContent(
-    BuildContext context, String clientName, String certificate) {
+    BuildContext context, String clientName, bool isCertified, bool isTrusted) {
   return [
     ListTile(
       leading: Icon(Icons.call_received),
@@ -15,24 +15,38 @@ List<Widget> _verificationContent(
     ListTile(
         leading: Icon(Icons.verified_user),
         title: Text(
-          'Certificate',
+          'Certified?',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        subtitle: Text(certificate)),
+        subtitle: Text(isCertified ? 'Yes' : 'No')),
+    ListTile(
+        leading: Icon(Icons.check),
+        title: Text(
+          'Requesting for trusted access?',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(isTrusted ? 'Yes' : 'No')),
     MaterialButton(
-      child: Text('hello'),
+      child: Text('Reject'),
       color: Colors.redAccent,
       onPressed: () {
-        Navigator.pop(context, 'hello');
+        Navigator.pop(context, false);
+      },
+    ),
+    MaterialButton(
+      child: Text('Approve'),
+      color: Colors.blueAccent,
+      onPressed: () {
+        Navigator.pop(context, true);
       },
     )
   ];
 }
 
 Future openVerificationDrawer(
-    BuildContext context, String clientName, String certificate) {
+    BuildContext context, String clientName, bool isCertified, bool isTrusted) {
   return openDrawer(
-      context, _verificationContent(context, clientName, certificate));
+      context, _verificationContent(context, clientName, isCertified, isTrusted));
 }
 
 Future openDrawer(BuildContext context, List<Widget> content) {

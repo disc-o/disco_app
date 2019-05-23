@@ -175,5 +175,22 @@ class DatabaseHelper {
     Database db = await instance.database;
     await db.execute('DELETE FROM $clientTable');
     await db.execute('DELETE FROM $tokenTable');
+    await db.execute('VACUUM');
+  }
+
+  Future<List<Map<String, dynamic>>> selectClientByClientId(String id) async {
+    Database db = await instance.database;
+    return await db.query(clientTable, where: 'client_id = ?', whereArgs: [id]);
+  }
+
+  Future<int> insertToTokenTable(
+      String token, String clientId, String scope, int expiresIn) async {
+    Database db = await instance.database;
+    return await db.insert(tokenTable, {
+      'token': token,
+      'client_id': clientId,
+      'scope': scope,
+      'expires_in': expiresIn
+    });
   }
 }

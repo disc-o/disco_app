@@ -9,6 +9,7 @@ import 'package:angel_oauth2/angel_oauth2.dart' as oauth2;
 import 'package:angel_oauth2/angel_oauth2.dart';
 import 'package:disco_app/client.dart';
 import 'package:disco_app/user.dart';
+import 'package:disco_app/widgets/drawer.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:disco_app/database_helper.dart' as db;
@@ -88,6 +89,9 @@ Future<AngelHttp> startWebServer(BuildContext context,
       ..get('/authorize', (req, res) async {
         await authServer.authorizationEndpoint(req, res);
       })
+      ..get('register', (req, res) async {
+        await authServer.registerNewClient(req, res);
+      })
       ..post('/token', (req, res) async {
         await authServer.tokenEndpoint(req, res);
       });
@@ -119,6 +123,43 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
   FutureOr<bool> invokeUserToAcceptClient(Client client) async {
     // print(await verify.openVerificationDrawer(
     //     context, client.name, client.publicKey));
+    return true;
+  }
+
+  Future<void> registerNewClient(
+      RequestContext req, ResponseContext res) async {
+    String state = '';
+    try {
+      var query = req.queryParameters;
+      state = query['state']?.toString() ?? '';
+      var clientId = await _getParam(req, 'client_id', state);
+      var clientName = await _getParam(req, 'client_name', state);
+      var clientSecret = await _getParam(req, 'client_secret', state);
+      bool isTrusted =
+          await _getParam(req, 'is_trusted', state) == 'true' ? true : false;
+      bool isCertified = await checkCertificate(req);
+      await req.parseBody();
+      var publicKey = req.bodyAsMap['public_key'];
+      bool accepted = await openVerificationDrawer(
+          context, clientName, isCertified, isTrusted);
+      if (accepted) {
+        db.DatabaseHelper.instance
+            .insertClient(clientId, clientName, clientSecret, isTrusted);
+      } else {
+        throw AuthorizationException(ErrorResponse(
+          ErrorResponse.unauthorizedClient,
+          'Rejected client "$clientId".',
+          state,
+        ));
+      }
+    } on AngelHttpException {
+      rethrow;
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  FutureOr<bool> checkCertificate(RequestContext req) async {
     return true;
   }
 
@@ -167,40 +208,40 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
 
   @override
   FutureOr<Client> findClient(String clientId) async {
-    // var list =
-    //     await db.DatabaseHelper.instance.selectClientByClientId(clientId);
-    // if (list.length != 1) {
-    //   throw oauth2.AuthorizationException(
-    //     oauth2.ErrorResponse(
-    //         oauth2.ErrorResponse.unauthorizedClient, 'Invalid client', ''),
-    //     statusCode: 404,
-    //   );
-    // } else {
-    //   var res = list[0];
-    //   return Client(
-    //       id: res['client_id'],
-    //       name: res['client_name'],
-    //       secret: res['client_secret'],
-    //       isTrusted: res['is_trusted'] == 1,
-    //       publicKey: res['public_key'] ?? '');
-    // }
-    return Client(id: '0', name: 'client', secret: 'secret', isTrusted: false, publicKey: 'key');
+    var list =
+        await db.DatabaseHelper.instance.selectClientByClientId(clientId);
+    if (list.length != 1) {
+      throw oauth2.AuthorizationException(
+        oauth2.ErrorResponse(
+            oauth2.ErrorResponse.unauthorizedClient, 'Invalid client', ''),
+        statusCode: 404,
+      );
+    } else {
+      var res = list[0];
+      return Client(
+          id: res['client_id'],
+          name: res['client_name'],
+          secret: res['client_secret'],
+          isTrusted: res['is_trusted'] == 1,
+          publicKey: res['public_key'] ?? '');
+    }
+    // return Client(id: '0', name: 'client', secret: 'secret', isTrusted: false, publicKey: 'key');
   }
 
   @override
   FutureOr<bool> verifyClient(Client client, String clientSecret) async {
-    // var list =
-    //     await db.DatabaseHelper.instance.selectClientByClientId(client.id);
-    // if (list.length != 1) {
-    //   throw oauth2.AuthorizationException(
-    //     oauth2.ErrorResponse(
-    //         oauth2.ErrorResponse.unauthorizedClient, 'Invalid client', ''),
-    //     statusCode: 404,
-    //   );
-    // } else {
-    //   var saltedSecret = list[0]['client_secret'];
-    //   return util.matchedPassword(clientSecret, saltedSecret);
-    // }
-    return true;
+    var list =
+        await db.DatabaseHelper.instance.selectClientByClientId(client.id);
+    if (list.length != 1) {
+      throw oauth2.AuthorizationException(
+        oauth2.ErrorResponse(
+            oauth2.ErrorResponse.unauthorizedClient, 'Invalid client', ''),
+        statusCode: 404,
+      );
+    } else {
+      var saltedSecret = list[0]['client_secret'];
+      return util.matchedPassword(clientSecret, saltedSecret);
+    }
+    // return true;
   }
 }
