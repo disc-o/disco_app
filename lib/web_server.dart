@@ -67,7 +67,7 @@ Future<AngelHttp> startWebServer(BuildContext context,
     {int port = 3000}) async {
   var app = Angel();
   var authServer = _AuthServer(context);
-  var _rgxBearer = RegExp(r'^[Bb]earer ([^\n\s]+)$');
+  var _rgxBearer = RegExp(r'^[Bb]earer');
   var http = AngelHttp(app);
 
   try {
@@ -95,18 +95,23 @@ Future<AngelHttp> startWebServer(BuildContext context,
       });
   });
 
-  app.fallback((req, res) {
+  app.fallback((req, res) async {
     var authToken =
         req.headers.value('authorization')?.replaceAll(_rgxBearer, '')?.trim();
 
     if (authToken == null) {
       throw AngelHttpException.forbidden();
     } else {
-      // TODO: The user has a token, now verify it.
-      // It is up to you how to store and retrieve auth tokens within your application.
-      // The purpose of `package:angel_oauth2` is to provide the transport
-      // across which you distribute these tokens in the first place.
-      throw UnimplementedError();
+      var list = await db.DatabaseHelper.instance.selectTokenByJwt(authToken);
+      if (list.isEmpty) {
+        throw AngelHttpException.forbidden();
+      } else if (list.length > 1) {
+        // This shouldn't happen...
+        throw AngelHttpException.badRequest();
+      } else {
+        var res = list[0];
+        print(res);
+      }
     }
   });
 
@@ -183,8 +188,6 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
     if (implicit) {
       // First verify the identity of client requesting for token
       var clientSecret = await _getParam(req, 'client_secret', state);
-      print(clientSecret);
-      print(client.secret);
       if (!util.matchedPassword(clientSecret, client.secret)) {
         throw oauth2.AuthorizationException(
           oauth2.ErrorResponse(oauth2.ErrorResponse.unauthorizedClient,

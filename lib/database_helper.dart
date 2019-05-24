@@ -186,8 +186,8 @@ class DatabaseHelper {
     return await db.query(clientTable, where: 'client_id = ?', whereArgs: [id]);
   }
 
-  Future<int> insertToTokenTable(
-      String token, String signSecret, String clientId, String scope, int expiresIn) async {
+  Future<int> insertToTokenTable(String token, String signSecret,
+      String clientId, String scope, int expiresIn) async {
     Database db = await instance.database;
     return await db.insert(tokenTable, {
       'token': token,
@@ -196,5 +196,11 @@ class DatabaseHelper {
       'scope': scope,
       'expires_in': expiresIn
     });
+  }
+
+  Future<List<Map<String, dynamic>>> selectTokenByJwt(String jwtString) async {
+    Database db = await instance.database;
+    return await db
+        .query(tokenTable, where: 'token = ?', whereArgs: [jwtString]);
   }
 }
