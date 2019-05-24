@@ -70,6 +70,17 @@ Future<AngelHttp> startWebServer(BuildContext context,
   var _rgxBearer = RegExp(r'^[Bb]earer');
   var http = AngelHttp(app);
 
+  FutureOr<bool> invokeUserToGrantDataAccess(
+      Map<String, dynamic> tokenRecord) async {
+    // Get information about the token, pop up confirmation window, request for consent, return the requested data
+    var cr = (await db.DatabaseHelper.instance
+        .selectClientByClientId(tokenRecord['client_id']))[0];
+    Client client = Client(name: cr['client_name']);
+    return await openGrantDataAccessDrawer(
+            context, client, tokenRecord['scope']) ==
+        true;
+  }
+
   try {
     // code below will print out the LAN address
     // print(await Wifi.ip);
@@ -111,6 +122,7 @@ Future<AngelHttp> startWebServer(BuildContext context,
       } else {
         var res = list[0];
         print(res);
+        print(await invokeUserToGrantDataAccess(res));
       }
     }
   });
@@ -118,8 +130,12 @@ Future<AngelHttp> startWebServer(BuildContext context,
   return http;
 }
 
-FutureOr<bool> invokeUserToGrantDataAccess(String authToken) {
-  // Get information about the token, pop up confirmation window, request for consent, return the requested data
+bool _scopeIsKeyB(String scopes) {
+  return scopes == 'key_b';
+}
+
+List<String> _getScopes(String scopes) {
+  return scopes.split(' ');
 }
 
 class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
