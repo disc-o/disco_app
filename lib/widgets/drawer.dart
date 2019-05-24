@@ -133,6 +133,46 @@ Future openGrantKeyBDrawer(BuildContext context, Client client, String scopes) {
   return openDrawer(context, _grantKeyBContent(context, client, scopes));
 }
 
+List<Widget> _grantDataAccessContent(
+    BuildContext context, Client client, String scopes) {
+  return [
+    ListTile(
+      leading: Icon(Icons.call_received),
+      title: Text(
+        'Requesting client',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
+      subtitle: Text(client.name),
+    ),
+    ListTile(
+      leading: Icon(Icons.power),
+      title: Text(
+        'Scope',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
+      subtitle: Text(scopes),
+    ),
+    MaterialButton(
+      child: Text('Reject'),
+      color: Colors.redAccent,
+      onPressed: () {
+        Navigator.pop(context, false);
+      },
+    ),
+    MaterialButton(
+      child: Text('Approve'),
+      color: Colors.blueAccent,
+      onPressed: () {
+        Navigator.pop(context, true);
+      },
+    )
+  ];
+}
+
+Future openGrantDataAccessDrawer(BuildContext context, Client client, String scopes) {
+  return openDrawer(context, _grantDataAccessContent(context, client, scopes));
+}
+
 Future openDrawer(BuildContext context, List<Widget> content) {
   List<Widget> _children = List();
   _children.add(Padding(

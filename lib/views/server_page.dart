@@ -112,6 +112,5 @@ class _ServerPageState extends State<ServerPage>
   }
 
   @override
-  // TODO: implement wantKeepAlive
   bool get wantKeepAlive => true;
 }

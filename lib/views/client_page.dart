@@ -116,6 +116,5 @@ class _ClientPageState extends State<ClientPage>
   }
 
   @override
-  // TODO: implement wantKeepAlive
   bool get wantKeepAlive => true;
 }

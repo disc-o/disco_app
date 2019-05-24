@@ -123,6 +123,5 @@ class _DbPageState extends State<DbPage>
   }
 
   @override
-  // TODO: implement wantKeepAlive
   bool get wantKeepAlive => true;
 }

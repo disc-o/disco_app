@@ -3,7 +3,6 @@ export 'package:angel_framework/http.dart';
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:angel_framework/angel_framework.dart';
 import 'package:angel_framework/http.dart';
@@ -17,6 +16,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:disco_app/database_helper.dart' as db;
 import 'package:disco_app/util.dart' as util;
 import 'package:corsac_jwt/corsac_jwt.dart' as jwt;
+import 'package:disco_app/data.dart' as data;
 // import 'package:disco_app/widgets/verification_drawer.dart' as verify;
 
 var htmlType = MediaType('text', 'html', {'charset': 'utf-8'});
@@ -137,9 +137,9 @@ Future<AngelHttp> startWebServer(BuildContext context,
         throw AngelHttpException.badRequest();
       } else {
         var tokenRecord = list[0];
-        if (await invokeUserToIssueKeyB(tokenRecord)) {
-          if (_scopeIsKeyB(tokenRecord['scopes'].toString())) {
-            // issue Key B
+        if (_scopeIsKeyB(tokenRecord['scopes'].toString())) {
+          // issue Key B
+          if (await invokeUserToIssueKeyB(tokenRecord)) {
             var signSecret = util.generateCryptoRandomString();
             var builder = jwt.JWTBuilder();
             var signer = jwt.JWTHmacSha256Signer(signSecret);
@@ -176,15 +176,88 @@ Future<AngelHttp> startWebServer(BuildContext context,
                 'scope': scopeString
               }));
           } else {
-            // return data using Key B
-            throw UnimplementedError('No data access is implemented');
+            throw oauth2.AuthorizationException(
+              oauth2.ErrorResponse(oauth2.ErrorResponse.unauthorizedClient,
+                  'User rejected your request', ''),
+              statusCode: 404,
+            );
           }
         } else {
-          throw oauth2.AuthorizationException(
-            oauth2.ErrorResponse(oauth2.ErrorResponse.unauthorizedClient,
-                'User rejected your request', ''),
-            statusCode: 404,
-          );
+          // return data using Key B
+          final RegExp _rgxBasic = RegExp(r'Basic ([^$]+)');
+          final RegExp _rgxBasicAuth = RegExp(r'([^:]*):([^$]*)');
+
+          Client client;
+
+          var id = req.queryParameters['client_id'];
+          var secret = req.queryParameters['client_secret'];
+
+          if (id == null || secret == null) {
+            throw AuthorizationException(
+              ErrorResponse(
+                ErrorResponse.unauthorizedClient,
+                'No client_id or client_secret in query params.',
+                state,
+              ),
+              statusCode: 400,
+            );
+          } else {
+            var clientId = id.toString(), clientSecret = secret.toString();
+
+            client = await authServer.findClient(clientId);
+
+            if (client == null) {
+              throw AuthorizationException(
+                ErrorResponse(
+                  ErrorResponse.unauthorizedClient,
+                  'Invalid "client_id" parameter.',
+                  state,
+                ),
+                statusCode: 400,
+              );
+            }
+
+            if (!client.isTrusted) {
+              throw AuthorizationException(
+                ErrorResponse(
+                  ErrorResponse.unauthorizedClient,
+                  'Untrusted client.',
+                  state,
+                ),
+                statusCode: 400,
+              );
+            }
+
+            if (!await authServer.verifyClient(client, clientSecret)) {
+              throw AuthorizationException(
+                ErrorResponse(
+                  ErrorResponse.unauthorizedClient,
+                  'Invalid "client_secret" parameter.',
+                  state,
+                ),
+                statusCode: 400,
+              );
+            }
+          }
+
+          if (await openGrantDataAccessDrawer(
+              context, client, tokenRecord['scopes'].toString())) {
+            Map<String, dynamic> resp = Map();
+            List<String> scopes = _getScopes(tokenRecord['scopes']);
+            for (String s in scopes) {
+              resp[s] = data.getUserData(s);
+            }
+            res
+              ..contentType =
+                  MediaType('application', 'json', {'charset': 'utf-8'})
+              ..write(jsonEncode(resp));
+          } else {
+            throw oauth2.AuthorizationException(
+              oauth2.ErrorResponse(oauth2.ErrorResponse.unauthorizedClient,
+                  'User rejected your request', ''),
+              statusCode: 404,
+            );
+          }
         }
       }
     }
