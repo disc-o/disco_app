@@ -114,6 +114,7 @@ class DatabaseHelper {
 
   // SQL code to create the database table
   Future _onCreate(Database db, int version) async {
+    print('Creating db...');
     await db.execute('''
       PRAGMA foreign_keys = 1
       ''');
@@ -129,6 +130,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE $tokenTable (
           token       TEXT,
+          sign_secret TEXT                                            NOT NULL,
           client_id   TEXT,
           scope       TEXT                                            NOT NULL,
           expires_in  INTEGER,
@@ -136,7 +138,8 @@ class DatabaseHelper {
           entry_time  DATETIME  DEFAULT (datetime('now','localtime')) NOT NULL,
           last_used   DATETIME,
           used_count  INTEGER   DEFAULT 0                             NOT NULL,
-          PRIMARY KEY (token)
+          PRIMARY KEY (token),
+          FOREIGN KEY (client_id) REFERENCES $clientTable(client_id)
       )
     ''');
     // await insertClient('001', 'client001', 'secret', false);
@@ -184,10 +187,11 @@ class DatabaseHelper {
   }
 
   Future<int> insertToTokenTable(
-      String token, String clientId, String scope, int expiresIn) async {
+      String token, String signSecret, String clientId, String scope, int expiresIn) async {
     Database db = await instance.database;
     return await db.insert(tokenTable, {
       'token': token,
+      'sign_secret': signSecret,
       'client_id': clientId,
       'scope': scope,
       'expires_in': expiresIn

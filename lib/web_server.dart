@@ -14,6 +14,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:disco_app/database_helper.dart' as db;
 import 'package:disco_app/util.dart' as util;
+import 'package:corsac_jwt/corsac_jwt.dart' as jwt;
 // import 'package:disco_app/widgets/verification_drawer.dart' as verify;
 
 class MyServer {}
@@ -91,9 +92,6 @@ Future<AngelHttp> startWebServer(BuildContext context,
       })
       ..get('register', (req, res) async {
         await authServer.registerNewClient(req, res);
-      })
-      ..post('/token', (req, res) async {
-        await authServer.tokenEndpoint(req, res);
       });
   });
 
@@ -113,6 +111,10 @@ Future<AngelHttp> startWebServer(BuildContext context,
   });
 
   return http;
+}
+
+FutureOr<bool> invokeUserToGrantDataAccess(String authToken) {
+  // Get information about the token, pop up confirmation window, request for consent, return the requested data
 }
 
 class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
@@ -192,13 +194,29 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       } else {
         // Now that the request has the correct client_secret, checking its certificate is not necessary.
         if (await invokeUserToReviewScope(client, scopes)) {
-          var token = util.generateCryptoRandomString();
+          var signSecret = util.generateCryptoRandomString();
+          var builder = jwt.JWTBuilder();
+          var signer = jwt.JWTHmacSha256Signer(signSecret);
+          var expireDuration = Duration(minutes: 1);
+          builder
+            ..issuer = 'http://api.sample.com'
+            ..expiresAt = DateTime.now().add(expireDuration)
+            ..issuedAt = DateTime.now()
+            ..audience =
+                'https://data.sample.com' // where this jwt is valid for, i.e. the resource endpoint
+            ..subject = client.id
+            ..setClaim('scope', scopes.toList());
+          String signedJwt = builder.getSignedToken(signer).toString();
           await db.DatabaseHelper.instance.insertToTokenTable(
-              token, client.id, scopes.reduce((a, b) => a + b), expiresIn);
+              signedJwt,
+              signSecret,
+              client.id,
+              scopes.reduce((a, b) => a + b),
+              expireDuration.inSeconds);
           res
             ..redirect(super.completeImplicitGrant(
-                oauth2.AuthorizationTokenResponse(token,
-                    expiresIn: expiresIn, scope: scopes),
+                oauth2.AuthorizationTokenResponse(signedJwt,
+                    expiresIn: expireDuration.inSeconds, scope: scopes),
                 Uri(path: redirectUri)));
         } else {
           throw oauth2.AuthorizationException(
