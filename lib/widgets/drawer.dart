@@ -69,7 +69,7 @@ List<Widget> _scopeReviewContent(
         'Scope',
         style: TextStyle(fontWeight: FontWeight.bold),
       ),
-      subtitle: Text(scopes.reduce((a, b) => a + b)),
+      subtitle: Text(scopes.reduce((a, b) => a + ', ' + b)),
     ),
     MaterialButton(
       child: Text('Reject'),
@@ -93,7 +93,7 @@ Future openScopeReviewDrawer(
   return openDrawer(context, _scopeReviewContent(context, client, scopes));
 }
 
-List<Widget> _grantDataAccessContent(
+List<Widget> _grantKeyBContent(
     BuildContext context, Client client, String scopes) {
   return [
     ListTile(
@@ -129,9 +129,8 @@ List<Widget> _grantDataAccessContent(
   ];
 }
 
-Future openGrantDataAccessDrawer(
-    BuildContext context, Client client, String scopes) {
-  return openDrawer(context, _grantDataAccessContent(context, client, scopes));
+Future openGrantKeyBDrawer(BuildContext context, Client client, String scopes) {
+  return openDrawer(context, _grantKeyBContent(context, client, scopes));
 }
 
 Future openDrawer(BuildContext context, List<Widget> content) {

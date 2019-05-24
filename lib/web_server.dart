@@ -2,6 +2,8 @@ export 'package:angel_framework/angel_framework.dart';
 export 'package:angel_framework/http.dart';
 
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:angel_framework/angel_framework.dart';
 import 'package:angel_framework/http.dart';
@@ -17,9 +19,12 @@ import 'package:disco_app/util.dart' as util;
 import 'package:corsac_jwt/corsac_jwt.dart' as jwt;
 // import 'package:disco_app/widgets/verification_drawer.dart' as verify;
 
-class MyServer {}
-
 var htmlType = MediaType('text', 'html', {'charset': 'utf-8'});
+
+var _issuer = 'http://127.0.0.1:3000';
+var _audience = 'http://127.0.0.1:3000';
+var _trustedClient = 'trusted_client';
+var _infiniteDuration = 0;
 
 Future<String> _getParam(RequestContext req, String name, String state,
     {bool body = false, bool throwIfEmpty = true}) async {
@@ -47,6 +52,15 @@ Future<String> _getParam(RequestContext req, String name, String state,
   return value;
 }
 
+bool _scopeIsKeyB(String scopes) {
+  // Just make sure you don't have multiple 'key_b' =)
+  return scopes.split(' ').where((t) => t == 'key_b').length == 1;
+}
+
+List<String> _getScopes(String scopes) {
+  return scopes.split(' ');
+}
+
 Future closeWebServer(Future<AngelHttp> http) async {
   AngelHttp t = await http;
   if (t != null) {
@@ -70,14 +84,12 @@ Future<AngelHttp> startWebServer(BuildContext context,
   var _rgxBearer = RegExp(r'^[Bb]earer');
   var http = AngelHttp(app);
 
-  FutureOr<bool> invokeUserToGrantDataAccess(
-      Map<String, dynamic> tokenRecord) async {
+  FutureOr<bool> invokeUserToIssueKeyB(Map<String, dynamic> tokenRecord) async {
     // Get information about the token, pop up confirmation window, request for consent, return the requested data
     var cr = (await db.DatabaseHelper.instance
         .selectClientByClientId(tokenRecord['client_id']))[0];
     Client client = Client(name: cr['client_name']);
-    return await openGrantDataAccessDrawer(
-            context, client, tokenRecord['scope']) ==
+    return await openGrantKeyBDrawer(context, client, tokenRecord['scopes']) ==
         true;
   }
 
@@ -107,6 +119,10 @@ Future<AngelHttp> startWebServer(BuildContext context,
   });
 
   app.fallback((req, res) async {
+    var state = '';
+    var query = req.queryParameters;
+    state = query['state']?.toString() ?? '';
+
     var authToken =
         req.headers.value('authorization')?.replaceAll(_rgxBearer, '')?.trim();
 
@@ -120,9 +136,56 @@ Future<AngelHttp> startWebServer(BuildContext context,
         // This shouldn't happen...
         throw AngelHttpException.badRequest();
       } else {
-        var res = list[0];
-        print(res);
-        print(await invokeUserToGrantDataAccess(res));
+        var tokenRecord = list[0];
+        if (await invokeUserToIssueKeyB(tokenRecord)) {
+          if (_scopeIsKeyB(tokenRecord['scopes'].toString())) {
+            // issue Key B
+            var signSecret = util.generateCryptoRandomString();
+            var builder = jwt.JWTBuilder();
+            var signer = jwt.JWTHmacSha256Signer(signSecret);
+            var expireDuration = Duration(minutes: 1);
+            var scopeString = tokenRecord['scopes']
+                .toString()
+                .split(' ')
+                .where((t) => t != 'key_b')
+                .join(' ');
+            builder
+              ..issuer = _issuer
+              ..expiresAt = DateTime.now().add(expireDuration)
+              ..issuedAt = DateTime.now()
+              ..audience =
+                  _audience // where this jwt is valid for, i.e. the resource endpoint
+              ..subject = _trustedClient
+              ..setClaim('scopes', scopeString);
+            String signedJwt = builder.getSignedToken(signer).toString();
+            await db.DatabaseHelper.instance.insertToTokenTable(
+                signedJwt,
+                signSecret,
+                tokenRecord[
+                    'client_id'], // this is strange but keep it this way for now
+                scopeString,
+                expireDuration.inSeconds);
+            res
+              ..contentType =
+                  MediaType('application', 'json', {'charset': 'utf-8'})
+              ..write(jsonEncode({
+                'access_token': signedJwt,
+                'token_type': 'bearer',
+                'state': state,
+                'expires_in': expireDuration.inSeconds,
+                'scope': scopeString
+              }));
+          } else {
+            // return data using Key B
+            throw UnimplementedError('No data access is implemented');
+          }
+        } else {
+          throw oauth2.AuthorizationException(
+            oauth2.ErrorResponse(oauth2.ErrorResponse.unauthorizedClient,
+                'User rejected your request', ''),
+            statusCode: 404,
+          );
+        }
       }
     }
   });
@@ -130,20 +193,12 @@ Future<AngelHttp> startWebServer(BuildContext context,
   return http;
 }
 
-bool _scopeIsKeyB(String scopes) {
-  return scopes == 'key_b';
-}
-
-List<String> _getScopes(String scopes) {
-  return scopes.split(' ');
-}
-
 class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
   int expiresIn = 3600;
   BuildContext context; // for notifying the user
   _AuthServer(this.context);
 
-  FutureOr<bool> invokeUserToReviewScope(
+  FutureOr<bool> invokeUserToReviewScopes(
       Client client, Iterable<String> scopes) async {
     try {
       return await openScopeReviewDrawer(context, client, scopes) == true;
@@ -212,25 +267,25 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
         );
       } else {
         // Now that the request has the correct client_secret, checking its certificate is not necessary.
-        if (await invokeUserToReviewScope(client, scopes)) {
+        if (await invokeUserToReviewScopes(client, scopes)) {
           var signSecret = util.generateCryptoRandomString();
           var builder = jwt.JWTBuilder();
           var signer = jwt.JWTHmacSha256Signer(signSecret);
           var expireDuration = Duration(minutes: 1);
           builder
-            ..issuer = 'http://api.sample.com'
+            ..issuer = _issuer
             ..expiresAt = DateTime.now().add(expireDuration)
             ..issuedAt = DateTime.now()
             ..audience =
-                'https://data.sample.com' // where this jwt is valid for, i.e. the resource endpoint
+                _audience // where this jwt is valid for, i.e. the resource endpoint
             ..subject = client.id
-            ..setClaim('scope', scopes.toList());
+            ..setClaim('scopes', scopes.toList());
           String signedJwt = builder.getSignedToken(signer).toString();
           await db.DatabaseHelper.instance.insertToTokenTable(
               signedJwt,
               signSecret,
               client.id,
-              scopes.reduce((a, b) => a + b),
+              scopes.reduce((a, b) => a + ' ' + b),
               expireDuration.inSeconds);
           res
             ..redirect(super.completeImplicitGrant(

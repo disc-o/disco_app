@@ -46,7 +46,9 @@ main(List<String> args) async {
   var signer = jwt.JWTHmacSha256Signer('secret');
   builder
     ..issuer = 'https://api.foobar.com'
-    ..expiresAt = DateTime.now().add(new Duration(minutes: 3)) // the number of seconds (not milliseconds) since Epoch referring to RFC 7519
+    ..expiresAt = DateTime.now().add(new Duration(
+        minutes:
+            3)) // the number of seconds (not milliseconds) since Epoch referring to RFC 7519
     ..setClaim('data', {'userId': 233});
   var token = builder.getSignedToken(signer);
   print(token);
