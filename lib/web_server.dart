@@ -3,6 +3,7 @@ export 'package:angel_framework/http.dart';
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:angel_framework/angel_framework.dart';
 import 'package:angel_framework/http.dart';
@@ -12,11 +13,14 @@ import 'package:disco_app/client.dart';
 import 'package:disco_app/user.dart';
 import 'package:disco_app/widgets/drawer.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:disco_app/database_helper.dart' as db;
 import 'package:disco_app/util.dart' as util;
 import 'package:corsac_jwt/corsac_jwt.dart' as jwt;
 import 'package:disco_app/data.dart' as data;
+import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 // import 'package:disco_app/widgets/verification_drawer.dart' as verify;
 
 var htmlType = MediaType('text', 'html', {'charset': 'utf-8'});
@@ -71,18 +75,38 @@ Future closeWebServer(Future<AngelHttp> http) async {
   }
 }
 
-// Future<AngelHttp> startWebServerWithContext(BuildContext context,
-//     {int port = 3000}) async {
-//   print(await cp.openVerificationDrawer(context, 'asd', 'asd'));
-//   return await startWebServer(context, port: port);
-// }
-
 Future<AngelHttp> startWebServer(BuildContext context,
     {int port = 3000}) async {
   var app = Angel();
   var authServer = _AuthServer(context);
   var _rgxBearer = RegExp(r'^[Bb]earer');
-  var http = AngelHttp(app);
+  AngelHttp http;
+
+  // try to start the https server
+  try {
+    /// loading asssets into app documents folder
+    var certFilename = 'cert.pem';
+    var keyFilename = 'key.pem';
+    Directory dir = await getApplicationDocumentsDirectory();
+    var certificateChainPath = join(dir.path, certFilename);
+    var serverKeyPath = join(dir.path, keyFilename);
+    ByteData certData = await rootBundle.load('assets/cert.pem');
+    ByteData keyData = await rootBundle.load('assets/key.pem');
+    List<int> certBytes = certData.buffer
+        .asUint8List(certData.offsetInBytes, certData.lengthInBytes);
+    List<int> keyBytes = keyData.buffer
+        .asUint8List(keyData.offsetInBytes, keyData.lengthInBytes);
+    await File(certificateChainPath).writeAsBytes(certBytes);
+    await File(serverKeyPath).writeAsBytes(keyBytes);
+
+    /// start the https server
+    http = AngelHttp.secure(app, certificateChainPath, serverKeyPath,
+        password: 'password');
+    await http.startServer('localhost', 3000);
+    print('Started HTTP server at ${http.server.address}:${http.server.port}');
+  } catch (e) {
+    print(e);
+  }
 
   FutureOr<bool> invokeUserToIssueKeyB(Map<String, dynamic> tokenRecord) async {
     // Get information about the token, pop up confirmation window, request for consent, return the requested data
@@ -93,20 +117,11 @@ Future<AngelHttp> startWebServer(BuildContext context,
         true;
   }
 
-  try {
-    // code below will print out the LAN address
-    // print(await Wifi.ip);
-    // use adb forward tcp:3000 tcp:3000 so that you can access localhost:3000 from your computer
-
-    await http.startServer('localhost', 3000);
-
-    // code below will listen on public network interface
-    // await http.startServer(InternetAddress.anyIPv4, 3000);
-
-    print('Started HTTP server at ${http.server.address}:${http.server.port}');
-  } catch (e) {
-    print(e);
-  }
+  app.get('/', (req, res) {
+    res
+      ..contentType = htmlType
+      ..write('Hello');
+  });
 
   app.group('/auth', (router) async {
     router
@@ -184,9 +199,6 @@ Future<AngelHttp> startWebServer(BuildContext context,
           }
         } else {
           // return data using Key B
-          final RegExp _rgxBasic = RegExp(r'Basic ([^$]+)');
-          final RegExp _rgxBasicAuth = RegExp(r'([^:]*):([^$]*)');
-
           Client client;
 
           var id = req.queryParameters['client_id'];
@@ -424,6 +436,5 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       var saltedSecret = list[0]['client_secret'];
       return util.matchedPassword(clientSecret, saltedSecret);
     }
-    // return true;
   }
 }
