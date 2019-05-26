@@ -1,7 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:disco_app/web_server.dart';
+import 'package:disco_app/data.dart' as data;
+import 'package:dio/dio.dart';
 
 TextStyle get whiteTextStyle => TextStyle(color: Colors.white);
+
+var _discoServer = '127.0.0.1';
+var _discoServerPort = 3001;
 
 class ServerPage extends StatefulWidget {
   @override
@@ -11,6 +18,8 @@ class ServerPage extends StatefulWidget {
 class _ServerPageState extends State<ServerPage>
     with AutomaticKeepAliveClientMixin<ServerPage> {
   Future<AngelHttp> http;
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  static var dio = Dio();
 
   bool _displayCloseServerButton = false;
   var _serverStatusText = 'Server status here';
@@ -26,6 +35,48 @@ class _ServerPageState extends State<ServerPage>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
+              Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    TextFormField(
+                      initialValue: 'https://sample.domain.com',
+                      decoration: InputDecoration(labelText: 'Proxy URL'),
+                      onSaved: (t) {
+                        data.proxyUrl = t;
+                      },
+                    ),
+                    TextFormField(
+                      decoration: InputDecoration(labelText: 'Referral Code'),
+                      onSaved: (t) {
+                        data.referralCode = t;
+                      },
+                    ),
+                    MaterialButton(
+                      child: Text(
+                        'Update',
+                        style: TextStyle(color: Colors.black),
+                      ),
+                      onPressed: () async {
+                        _formKey.currentState.save();
+                      },
+                      color: Colors.greenAccent,
+                    ),
+                  ],
+                ),
+              ),
+              MaterialButton(
+                color: Colors.green,
+                child: Text('Connect remote'),
+                onPressed: () async {
+                  var resp = await dio.get('http://127.0.0.1:3001');
+                  print(resp.data);
+                },
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 10.0),
+              ),
               MaterialButton(
                 color: Theme.of(context).accentColor,
                 child: Text(

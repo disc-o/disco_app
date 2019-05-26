@@ -18,3 +18,6 @@ Map<String, dynamic> userData = {
 dynamic getUserData(String item) {
   return userData[item];
 }
+
+String proxyUrl = '';
+String referralCode = '';

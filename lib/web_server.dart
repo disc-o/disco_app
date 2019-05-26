@@ -82,31 +82,41 @@ Future<AngelHttp> startWebServer(BuildContext context,
   var _rgxBearer = RegExp(r'^[Bb]earer');
   AngelHttp http;
 
-  // try to start the https server
-  try {
-    /// loading asssets into app documents folder
-    var certFilename = 'cert.pem';
-    var keyFilename = 'key.pem';
-    Directory dir = await getApplicationDocumentsDirectory();
-    var certificateChainPath = join(dir.path, certFilename);
-    var serverKeyPath = join(dir.path, keyFilename);
-    ByteData certData = await rootBundle.load('assets/cert.pem');
-    ByteData keyData = await rootBundle.load('assets/key.pem');
-    List<int> certBytes = certData.buffer
-        .asUint8List(certData.offsetInBytes, certData.lengthInBytes);
-    List<int> keyBytes = keyData.buffer
-        .asUint8List(keyData.offsetInBytes, keyData.lengthInBytes);
-    await File(certificateChainPath).writeAsBytes(certBytes);
-    await File(serverKeyPath).writeAsBytes(keyBytes);
+  // // try to start the https server
+  // try {
+  //   /// loading asssets into app documents folder
+  //   var certFilename = 'cert.pem';
+  //   var keyFilename = 'key.pem';
+  //   Directory dir = await getApplicationDocumentsDirectory();
+  //   var certificateChainPath = join(dir.path, certFilename);
+  //   var serverKeyPath = join(dir.path, keyFilename);
+  //   ByteData certData = await rootBundle.load('assets/cert.pem');
+  //   ByteData keyData = await rootBundle.load('assets/key.pem');
+  //   List<int> certBytes = certData.buffer
+  //       .asUint8List(certData.offsetInBytes, certData.lengthInBytes);
+  //   List<int> keyBytes = keyData.buffer
+  //       .asUint8List(keyData.offsetInBytes, keyData.lengthInBytes);
+  //   await File(certificateChainPath).writeAsBytes(certBytes);
+  //   await File(serverKeyPath).writeAsBytes(keyBytes);
 
-    /// start the https server
-    http = AngelHttp.secure(app, certificateChainPath, serverKeyPath,
-        password: 'password');
-    await http.startServer('localhost', 3000);
-    print('Started HTTP server at ${http.server.address}:${http.server.port}');
-  } catch (e) {
-    print(e);
-  }
+  //   /// start the https server
+  //   http = AngelHttp.secure(app, certificateChainPath, serverKeyPath,
+  //       password: 'password');
+  //   await http.startServer('localhost', 3000);
+  //   print('Started HTTP server at ${http.server.address}:${http.server.port}');
+  // } catch (e) {
+  //   print(e);
+  // }
+
+  /// Then I realized that unsigned certificate might be a headache.
+  /// Since we're going to use a server to do some LAN penertration anyways,
+  /// how about we simply create HTTPS connection with that middle server,
+  /// so that things are easier... network activity happening within the device
+  /// doesn't need to be encrypted if the system itself is well-designed...
+  /// So use this service instead: https://localtunnel.github.io/www/
+  http = AngelHttp(app);
+  await http.startServer('localhost', 3000);
+  print('Started HTTP server at ${http.server.address}:${http.server.port}');
 
   FutureOr<bool> invokeUserToIssueKeyB(Map<String, dynamic> tokenRecord) async {
     // Get information about the token, pop up confirmation window, request for consent, return the requested data
