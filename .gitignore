@@ -73,3 +73,6 @@
 
 disco/
 .env
+.pem
+assets/key.pem
+assets/cert.pem
