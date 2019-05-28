@@ -10,6 +10,7 @@ TextStyle get whiteTextStyle => TextStyle(color: Colors.white);
 
 var _discoServer = '127.0.0.1';
 var _discoServerPort = 3001;
+var _uidUrl = 'http://127.0.0.1:3001/uid';
 
 class ServerPage extends StatefulWidget {
   @override
@@ -42,7 +43,7 @@ class _ServerPageState extends State<ServerPage>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
                     TextFormField(
-                      initialValue: 'https://sample.domain.com',
+                      initialValue: 'https://disco-app.localtunnel.me',
                       decoration: InputDecoration(labelText: 'Proxy URL'),
                       onSaved: (t) {
                         data.proxyUrl = t;
@@ -73,12 +74,13 @@ class _ServerPageState extends State<ServerPage>
                 onPressed: () async {
                   HttpClient client = HttpClient();
                   var req = await client
-                      .postUrl(Uri.parse('http://127.0.0.1:3001/uid'));
+                      .postUrl(Uri.parse(_uidUrl));
                   req.headers.set('content-type', 'application/json');
                   req.add(utf8.encode(json.encode(
                       {'uid': data.referralCode, 'proxy_url': data.proxyUrl})));
                   var resp = await req.close();
-                  print(await resp.transform(utf8.decoder).join());
+                  print('challenge from disco server:');
+                  data.challengeFromServer = jsonDecode(await resp.transform(utf8.decoder).join())['challenge'];
                   // var resp = await dio.post('http://127.0.0.1:3001',
                   // data: {
                   //   'uid': data.referralCode,

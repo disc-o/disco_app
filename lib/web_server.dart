@@ -328,7 +328,6 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
           await _getParam(req, 'is_trusted', state) == 'true' ? true : false;
       bool isCertified = await checkCertificate(req);
       await req.parseBody();
-      var publicKey = req.bodyAsMap['public_key'];
       bool accepted = await openRegisterVerificationDrawer(
           context, clientName, isCertified, isTrusted);
       if (accepted) {
@@ -351,8 +350,8 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
   }
 
   FutureOr<bool> checkCertificate(RequestContext req) async {
-    // TODO: Implement certificate check
-    return true;
+    data.challengeFromClient = req.headers['challenge'][0];
+    return data.challengeFromClient == data.challengeFromServer;
   }
 
   @override

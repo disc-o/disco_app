@@ -21,3 +21,6 @@ dynamic getUserData(String item) {
 
 String proxyUrl = '';
 String referralCode = '';
+
+String challengeFromServer = '';
+String challengeFromClient = '';
