@@ -329,7 +329,7 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       bool isCertified = await checkCertificate(req);
       await req.parseBody();
       bool accepted = await openRegisterVerificationDrawer(
-          context, clientName, isCertified, isTrusted);
+          context, clientName, isCertified, isTrusted) == true;
       if (accepted) {
         String saltedPassword = util.addSalt(clientSecret);
         // print(util.matchedPassword(clientSecret, saltedPassword));
