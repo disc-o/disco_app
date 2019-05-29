@@ -157,13 +157,13 @@ If IKEA has never contacted me before, it needs to register itself on my Disco a
     "query_params": {
         "state": "a random string",
         "client_id": "IKEA's ID",
-        "client_secret": "secret",  // client_id and secret is no different from username and password, so IKEA is free to generate these randomly as long as it keeps the record in its database and use the same pair of username&password to authenticate itself for the same user (me) next time
+        "client_secret": "secret // client_id and secret is no different from username and password, so IKEA is free to generate these randomly as long as it keeps the record in its database and use the same pair of username&password to authenticate itself for the same user (me) next time",
         "client_name": "IKEA (optional)",
-        "is_trusted": false // since IKEA is an untrusted client...
+        "is_trusted": false
     },
     "headers": {
         "content-type": "text/plain",
-        "challenge": "decrypted encrypted c"    // since IKEA only received the encrypted c, it should be able to decrypt it and send it back to me for verification, also this challenge can be in the query parameters, storing non-standard information in headers is a bit strange, will change later
+        "challenge": "decrypted encrypted c  // since IKEA only received the encrypted c, it should be able to decrypt it and send it back to me for verification, also this challenge can be in the query parameters, storing non-standard information in headers is a bit strange, will change later"
     }
 }
 ```
@@ -182,7 +182,7 @@ If I accepted the registration request, IKEA would receive a 200 OK response so 
         "client_secret": "secret",
         "client_name": "IKEA (optional)",
         "response_type": "token",
-        "redirect_uri": "https://ikea.com/redirect",    // this can be anything as we won't follow the redirect anyways, but it provides an alternative way of handling the callback
+        "redirect_uri": "https://ikea.com/redirect   // this can be anything as we won't follow the redirect anyways, but it provides an alternative way of handling the callback",
         "scope": "key_b+address",
     },
     "followAllRedirects": false
@@ -213,10 +213,10 @@ It is very similar to requesting *key A*, just the scope is different:
         "client_secret": "secret",
         "client_name": "IKEA (optional)",
         "response_type": "token",
-        "redirect_uri": "https://ikea.com/redirect",    // this can be anything as we won't follow the redirect anyways, but it provides an alternative way of handling the callback
+        "redirect_uri": "https://ikea.com/redirect",
         "scope": "address",
         "audience": "Singpost",
-        "certificate": "Singpost's certificate (optional)"  // if the company wants to inform the user they only intend to share his address with Singpost it can add these extra information, but user's will decide in the end
+        "certificate": "Singpost's certificate (optional, if the company wants to inform the user they only intend to share his address with Singpost it can add these extra information, but user's will decide in the end)"  
     },
     "followAllRedirects": false
 }
