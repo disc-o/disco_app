@@ -6,6 +6,12 @@ List<Widget> _registerVerificationContent(
     BuildContext context, String clientName, bool isCertified, bool isTrusted) {
   return [
     ListTile(
+      title: Text(
+        'Registration verfication',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
+    ),
+    ListTile(
       leading: Icon(Icons.call_received),
       title: Text(
         'Requesting client',
@@ -56,6 +62,12 @@ List<Widget> _scopeReviewContent(
     BuildContext context, Client client, Iterable<String> scopes) {
   return [
     ListTile(
+      title: Text(
+        'Data access verification',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
+    ),
+    ListTile(
       leading: Icon(Icons.call_received),
       title: Text(
         'Requesting client',
@@ -96,6 +108,12 @@ Future openScopeReviewDrawer(
 List<Widget> _grantKeyBContent(
     BuildContext context, Client client, String scopes) {
   return [
+    ListTile(
+      title: Text(
+        'Trusted access verification',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
+    ),
     ListTile(
       leading: Icon(Icons.call_received),
       title: Text(
@@ -184,7 +202,7 @@ Future openDrawer(BuildContext context, List<Widget> content) {
     context: context,
     builder: (builder) {
       return Container(
-        height: 350.0,
+        height: 500.0,
         color: Colors.transparent,
         child: Container(
           decoration: BoxDecoration(

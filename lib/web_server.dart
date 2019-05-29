@@ -29,6 +29,7 @@ var _issuer = 'http://127.0.0.1:3000';
 var _audience = 'http://127.0.0.1:3000';
 var _trustedClient = 'trusted_client';
 var _infiniteDuration = 0;
+_AuthServer authServer;
 
 Future<String> _getParam(RequestContext req, String name, String state,
     {bool body = false, bool throwIfEmpty = true}) async {
@@ -78,7 +79,7 @@ Future closeWebServer(Future<AngelHttp> http) async {
 Future<AngelHttp> startWebServer(BuildContext context,
     {int port = 3000}) async {
   var app = Angel();
-  var authServer = _AuthServer(context);
+  authServer = _AuthServer(context);
   var _rgxBearer = RegExp(r'^[Bb]earer');
   AngelHttp http;
 
@@ -309,15 +310,26 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       var query = req.queryParameters;
       state = query['state']?.toString() ?? '';
       var clientId = await _getParam(req, 'client_id', state);
+      try {
+        var client = await authServer.findClient(clientId);
+        if (client != null) {
+          throw AuthorizationException(ErrorResponse(
+            ErrorResponse.invalidRequest,
+            'Registered yourself more than once',
+            state,
+          ));
+        }
+      } on AngelHttpException {
+        rethrow;
+      }
       var clientName = await _getParam(req, 'client_name', state);
       var clientSecret = await _getParam(req, 'client_secret', state);
       bool isTrusted =
           await _getParam(req, 'is_trusted', state) == 'true' ? true : false;
       bool isCertified = await checkCertificate(req);
       await req.parseBody();
-      var publicKey = req.bodyAsMap['public_key'];
       bool accepted = await openRegisterVerificationDrawer(
-          context, clientName, isCertified, isTrusted);
+          context, clientName, isCertified, isTrusted) == true;
       if (accepted) {
         String saltedPassword = util.addSalt(clientSecret);
         // print(util.matchedPassword(clientSecret, saltedPassword));
@@ -338,8 +350,8 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
   }
 
   FutureOr<bool> checkCertificate(RequestContext req) async {
-    // TODO: Implement certificate check
-    return true;
+    data.challengeFromClient = req.headers['challenge'][0];
+    return data.challengeFromClient == data.challengeFromServer;
   }
 
   @override
@@ -386,7 +398,7 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
             ..redirect(super.completeImplicitGrant(
                 oauth2.AuthorizationTokenResponse(signedJwt,
                     expiresIn: expireDuration.inSeconds, scope: scopes),
-                Uri(path: redirectUri)));
+                Uri.parse(redirectUri)));
         } else {
           throw oauth2.AuthorizationException(
             oauth2.ErrorResponse(oauth2.ErrorResponse.unauthorizedClient,
@@ -415,11 +427,12 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
     var list =
         await db.DatabaseHelper.instance.selectClientByClientId(clientId);
     if (list.length != 1) {
-      throw oauth2.AuthorizationException(
-        oauth2.ErrorResponse(
-            oauth2.ErrorResponse.unauthorizedClient, 'Invalid client', ''),
-        statusCode: 404,
-      );
+      return null;
+      // throw oauth2.AuthorizationException(
+      //   oauth2.ErrorResponse(
+      //       oauth2.ErrorResponse.unauthorizedClient, 'Invalid client', ''),
+      //   statusCode: 404,
+      // );
     } else {
       var res = list[0];
       return Client(
