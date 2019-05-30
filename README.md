@@ -156,7 +156,7 @@ By providing a `public_key`, I don't need to trust Disco server's tunnel service
 
 If IKEA has never contacted me before, it needs to register itself on my Disco app first:
 
-- Encode the following JSON to a string, then encrypt it using `public_key` to string `p`
+- Encode the following JSON to a string, then encrypt it using `public_key` to JSON `p` (because the mathematical limitation of RSA algorithm, it is impossible to directly encrypt a message that's too long, so we randomly generate a 16-byte long key and 16-byte long initialization vector, using [AES-CBC](https://tools.ietf.org/html/rfc3602), a symmetric encryption algorithm with no length limitation to encrypt the message, then use the public key to encrypt these two short strings.)
 
 ```json
 {
@@ -168,6 +168,18 @@ If IKEA has never contacted me before, it needs to register itself on my Disco a
     "challenge": "decrypted encrypted c  // since IKEA only received the encrypted c, it should be able to decrypt it and send it back to me for verification, also this challenge can be in the query parameters, storing non-standard information in headers is a bit strange, will change later"
 }
 ```
+
+The resulting JSON `p` should be in the format and look like:
+
+```json
+{
+    "key": "Q8ZtJzfYq_RwYndUaW98_3Xzq1mjK-CSXlB-dhGtl_rIPPZ1SwIMoX5VnhjL3mBe0SMv5LjJxf5caJtp30O6lt599o6emGJ8FWF7SoKdNnfhAFn3MRcyOqw9je1-SM0e9C29kP2VrtereJcU0s21Z0xuu1nBSArnEVlawu_OfbZJPubCn9yg-Bvgu0kLzGgN2UUmU5qFCKZt9bGhCIP-S1xcQfoYm9o1B60b5QPVDTa1qPs6h6ewJVPShPRrT-FlSuEnTiRInZGoxwjQhoV6Xak0sNypOHfkQf_HLrl4GoNut-hJ2aTZot-rwNg-Q2RjTXXY8bXExw0XySk77r990A==",
+    "iv": "dD_-nInLEq3s-AUVpl91R9ap_FWtLDEYsz4IR7IkLgCUPjf-z6k_Ht-vQyCyGcJPtwSNR8QHSQDJO93-jXtxs0Rz7PtDCB5mOYSoNhdQiTQemfk4cz1y5SxHaCA10SZExH2MsTanwlCghKQqU7tbfubWTfiLT1qCbeLrg3pRB5WXUJQcD6GaOW9FLX7yxKhjrqJ19xpVp0vdGdndKwsjLSpMZEfrygH2ANC5-6dbNHM32X1gGK609HPB-N4sPN8xAcd3HQgc4qW7xpxkc2fqljmDZDVniclBogd0Kaw9tull7u_3r_-j4-SDvfDiyz68S7caSjyKWOd8hZrqoG8I1g==",
+    "encrypted": "A/za/mN2itMIZNiRYGq0IUFeYgfcqary0AOyoa0DgKolqO+qVXu0NUaLfOU46jf/I0LyifAUiX7GK5eFy3NUOvEouW1nqf8IgdiN8S0srYgcpKLzeDfSpk3WPNlIPgiIFMhzNSVwlVYHKE8cRQezU3R6qrSYK2MwOS1SmI5Fzs3N3dRjAPUC247XVzqJz9nysWaFBJtNM6f2+IwOCWqlPQ=="
+}
+```
+
+**Note:** all byte array data, if without mentioning, are encoded in Base64.
 
 - Send an HTTP request to `proxy_url` (i.e. a tunnel to localhost:3000, where the OAuth 2.0 service is running on my phone) with the following config:
 
@@ -186,7 +198,7 @@ If IKEA has never contacted me before, it needs to register itself on my Disco a
 
 If I accepted the registration request, IKEA would receive a 200 OK response so that they can proceed to request for *key A*:
 
-- Encode the following JSON to a string, then encrypt it using `public_key` to string `s`
+- Encode the following JSON to a string, then encrypt it using `public_key` to JSON `s` in a similar way mentioned above
 
 **Note:** 
 
@@ -200,6 +212,16 @@ If I accepted the registration request, IKEA would receive a 200 OK response so 
     "response_type": "token",
     "redirect_uri": "https://ikea.com/redirect",
     "scope": "key_b+address",
+}
+```
+
+The resulting JSON `s` should be in the format and look like:
+
+```json
+{
+    "key": "Oe1l4RqZY-5G0ZWh9GX_R4M87aKc-w3uJQEfH1_nSRLdVxMy6DmTIgHfI97oyhAbDvpPaSbS9kv0sqGKZf_Gj1W57E8GV7mN3zRbCUeyUG7Kjps_ii6ABoVbt4iXYAPT_-v0O_8CQtldv9iDWgmh0Rr2u-TaZIqFljtsxoVd5rp4GLybHoGRWktxWWvI9aLfKiVyIMsftiVNJzJASFnewI1T6UcubhPrtqyX1xACpBrOJ3a-ZJLk6D-SGtMOb7MEvrDqAryGZiwasCM83a5Czrxlj9lSJPupZM8VulnCghd3gAuxa6LnDeRNjbvQr2SoIBivWc6W05hS4fs40O1iNg==",
+    "iv": "LcZLp2Uy0hwnuB4sl5ha46fMCTqBUnxZ-iZM8B3lQBp5MxGreHXgEjwUuOQ2FkJOtprxguSvwAj6FeF9rARkKK7TmPBQ6D3PCsLnRE95Vo-4QzZq5kNizT-A7EEH1TRJiz0i_M4OACbgarb0DV2nXdyKkC-9zl70Ghi6HvDlOsnwQ9IM3SB0jk5lcdZ7-FsWoEZPnBHr7HzjoVPQBigQ2nOSkn8CPK0m0e-VDhI6C0hPNq31o716USWDNcDv8ko7GQwCSt0o2vqv9A1xEYXZggQDjPu9wjeI0cEuTq_Gozkx3XjOhWCTf9-dpMctimXOsq9Jokk4jbmibPkWdWaNYw==",
+    "encrypted": "KRscl3hxHhgho4ZvpenNS+ov1Ud7aAlnKtXthOxi+xu8YTjukrhrFEHU/B9Sk7UrgmvIj0qzyWwRyIkACPHwgkq+5eFYmb7a43kZbM/I+GJMPtUTYVuUuTL+/XaIxbpyymGaoFIGOB8ZGfhxNSRXWP8Zpif48FgruUD9DS0fQwNodFR3tEqjrSNxg/C1wR4a"
 }
 ```
 
@@ -238,7 +260,7 @@ Note that the key is encoded and signed in [JSON Web Tokens](jwt.io) format so t
 
 // Add how IKEA finds me here, later
 
-- Encode the following JSON to a string, then encrypt it using `public_key` to string `ss`
+- Encode the following JSON to a string, then encrypt it using `public_key` to JSON `ss`
 
 ```json
 {

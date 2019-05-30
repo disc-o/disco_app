@@ -30,6 +30,23 @@ var _trustedClient = 'trusted_client';
 _AuthServer authServer;
 var _rsaHelper = rsa.RsaKeyHelper();
 
+Future<util.SymmetricEncrypted> _getSEParam(
+    RequestContext req, String state) async {
+  Map<String, dynamic> data = await req.parseBody().then((_) => req.bodyAsMap);
+  Map<String, dynamic> value = data.containsKey('data') ? data['data'] : null;
+  try {
+    if (value == null ||
+        value['key'] == null ||
+        value['iv'] == null ||
+        value['encrypted'] == null)
+      throw Exception('data is empty or incomplete');
+    return util.SymmetricEncrypted(
+        value['key'], value['iv'], value['encrypted']);
+  } catch (e) {
+    throw AngelHttpException.badRequest(message: e.toString());
+  }
+}
+
 Future<String> _getParam(RequestContext req, String name, String state,
     {bool body = false, bool throwIfEmpty = true}) async {
   Map<String, dynamic> data;
@@ -128,10 +145,16 @@ Future<AngelHttp> startWebServer(BuildContext context,
     "redirect_uri": "https://ikea.com/redirect",
     "scope": "key_b+address",
   });
-  print(my1);
-  print(_rsaHelper.encrypt(my1, data.keyPair.publicKey));
-  print(my2);
-  print(_rsaHelper.encrypt(my2, data.keyPair.publicKey));
+  var aa = util.SymmetricEncrypted.asymEncrypted(
+      util.encryptSymmetric(my1), _rsaHelper, data.keyPair.publicKey);
+  print(aa);
+  print(util.decryptAsymmetricallyEncryptedSE(
+      aa, _rsaHelper, data.keyPair.privateKey));
+  var bb = util.SymmetricEncrypted.asymEncrypted(
+      util.encryptSymmetric(my2), _rsaHelper, data.keyPair.publicKey);
+  print(bb);
+  print(util.decryptAsymmetricallyEncryptedSE(
+      bb, _rsaHelper, data.keyPair.privateKey));
 
   // above is for testing purposes ---------------
 
@@ -324,8 +347,9 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
     String state = '';
     try {
       await req.parseBody();
-      var rawData = await _getParam(req, 'data', state, body: true);
-      var rawJsonString = _rsaHelper.decrypt(rawData, data.keyPair.privateKey);
+      util.SymmetricEncrypted enc = await _getSEParam(req, state);
+      var rawJsonString = util.decryptAsymmetricallyEncryptedSE(
+          enc, _rsaHelper, data.keyPair.privateKey);
       var body = jsonDecode(rawJsonString);
       state = body['state']?.toString() ?? '';
       var clientId = await _getParamFromMap(body, 'client_id', state);
@@ -390,8 +414,10 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
     try {
       var query = req.queryParameters;
       state = query['state']?.toString() ?? '';
-      var rawData = query['data'];
-      if (rawData == null) {
+      var key = query['key'];
+      var iv = query['iv'];
+      var encrypted = query['encrypted'];
+      if (key == null || iv == null || encrypted == null) {
         throw AuthorizationException(ErrorResponse(
           ErrorResponse.invalidRequest,
           'Invalid data query parameter',
@@ -400,18 +426,17 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       }
       Map<String, dynamic> body;
       try {
-        var rawJsonString =
-            _rsaHelper.decrypt(rawData, data.keyPair.privateKey);
+        var enc = util.SymmetricEncrypted(key, iv, encrypted);
+        var rawJsonString = util.decryptAsymmetricallyEncryptedSE(
+            enc, _rsaHelper, data.keyPair.privateKey);
         body = jsonDecode(rawJsonString);
         print(body);
       } catch (e) {
-        if (rawData == null) {
-          throw AuthorizationException(ErrorResponse(
-            ErrorResponse.invalidRequest,
-            e.toString(),
-            state,
-          ));
-        }
+        throw AuthorizationException(ErrorResponse(
+          ErrorResponse.invalidRequest,
+          e.toString(),
+          state,
+        ));
       }
       var responseType = await _getParamFromMap(body, 'response_type', state);
 
@@ -480,9 +505,14 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       bool implicit) async {
     if (implicit) {
       var query = req.queryParameters;
-      var rawData = query['data'];
+      state = query['state']?.toString() ?? '';
+      var key = query['key'];
+      var iv = query['iv'];
+      var encrypted = query['encrypted'];
       Map<String, dynamic> body;
-      var rawJsonString = _rsaHelper.decrypt(rawData, data.keyPair.privateKey);
+      var enc = util.SymmetricEncrypted(key, iv, encrypted);
+      var rawJsonString = util.decryptAsymmetricallyEncryptedSE(
+          enc, _rsaHelper, data.keyPair.privateKey);
       body = jsonDecode(rawJsonString);
       // First verify the identity of client requesting for token
       var clientSecret = await _getParamFromMap(body, 'client_secret', state);

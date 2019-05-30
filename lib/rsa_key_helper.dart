@@ -89,7 +89,7 @@ class RsaKeyHelper {
   }
 
   /// Encrypts [text] and return the result using Base64Url codec
-  String encrypt(String text, RSAPublicKey publicKey) {
+  String encryptAsymmetric(String text, RSAPublicKey publicKey) {
     AsymmetricKeyParameter<RSAPublicKey> keyParametersPublic =
         PublicKeyParameter(publicKey);
     var cipher = RSAEngine()..init(true, keyParametersPublic);
@@ -97,13 +97,13 @@ class RsaKeyHelper {
     return base64UrlEncode(cipherText);
   }
 
-  /// Decrypts [cipherText] which uses Base64 codec
-  String decrypt(String cipherText, RSAPrivateKey privateKey) {
+  /// Decrypts [cipherTextBase64] which uses Base64 codec
+  String decryptAsymmetric(String cipherTextBase64, RSAPrivateKey privateKey) {
     AsymmetricKeyParameter<RSAPrivateKey> keyParametersPrivate =
         PrivateKeyParameter(privateKey);
     var cipher = RSAEngine()..init(false, keyParametersPrivate);
     var decrypted =
-        cipher.process(Uint8List.fromList(base64Decode(cipherText)));
+        cipher.process(Uint8List.fromList(base64Decode(cipherTextBase64)));
     return String.fromCharCodes(decrypted);
   }
 
