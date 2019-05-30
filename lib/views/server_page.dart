@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:disco_app/util.dart' as util;
 import 'package:flutter/material.dart';
 import 'package:disco_app/web_server.dart';
 import 'package:disco_app/data.dart' as data;
@@ -8,9 +9,8 @@ import 'package:dio/dio.dart';
 
 TextStyle get whiteTextStyle => TextStyle(color: Colors.white);
 
-var _discoServer = '127.0.0.1';
-var _discoServerPort = 3001;
-var _uidUrl = 'http://127.0.0.1:3001/uid';
+// var _discoServer = '127.0.0.1';
+// var _discoServerPort = 3001;
 
 class ServerPage extends StatefulWidget {
   @override
@@ -72,22 +72,7 @@ class _ServerPageState extends State<ServerPage>
                 color: Colors.green,
                 child: Text('Connect remote'),
                 onPressed: () async {
-                  HttpClient client = HttpClient();
-                  var req = await client
-                      .postUrl(Uri.parse(_uidUrl));
-                  req.headers.set('content-type', 'application/json');
-                  req.add(utf8.encode(json.encode(
-                      {'uid': data.referralCode, 'proxy_url': data.proxyUrl})));
-                  var resp = await req.close();
-                  print('challenge from disco server:');
-                  data.challengeFromServer = jsonDecode(await resp.transform(utf8.decoder).join())['challenge'];
-                  // var resp = await dio.post('http://127.0.0.1:3001',
-                  // data: {
-                  //   'uid': data.referralCode,
-                  //   'proxy_url': data.proxyUrl
-                  // },
-                  //     options: Options(contentType: ContentType.json));
-                  // print(resp.data);
+                  await util.connectRemote();
                 },
               ),
               Padding(

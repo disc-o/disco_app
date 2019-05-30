@@ -1,6 +1,8 @@
-# disco_app
+# Disco App
 
-A Decentralized Self-contained OAuth 2.0 Service.
+A Decentralized Self-contained OAuth-2.0-like Service, running on both Android and iOS.
+
+This service aims to achieve all-round control over personal information by letting mobile devices to act as authorization servers hosting the information of the device's owner. End-to-end encryption means you don't even need to trust the Disco server.
 
 ## Getting Started
 
@@ -113,13 +115,18 @@ Also, I assume the root domain of Disco server is `https://dis.co`
 
 ```json
 {
-    "method": "PUT",
+    "method": "POST",
     "body": {
         "uid": "the uid I just pasted",
-        "proxy_url": "https://[uid].localtunnel.me"
+        "proxy_url": "https://[uid].localtunnel.me",
+        "public_key": "-----BEGIN PUBLIC KEY-----MIIBCgKCAQEAsBUse4hn0lx0AwZrH40JwFJMrgJCEh7mg7U\PHtrydJjs5utv279reBqO6kZiXSN4dhIgN3fg9jxvwQcDDs46nKDozNbmjp1jPxYwHVGYk91Rhvspcuh5CZlQIZp9KjRH9lG0tjolyNOQEDsPQH5Oc6f9NPIcOALrWQ++wLX7nVbe5TlsZv0Lz/wJJqafCLtjEW5LuHsIwyg+h3Vkf5xKahpwLEHcX1rFyvc0FPy9QALzycrtKzXpq6WZ/pco++wt+E/iZIXFApCZILacK/xoHKbZipYoPPJBjpHD8/5nqB9Bj1rRNgPeMtNTnbBbktvXshjoy5dQtNr3qygGB1cywIDAQAB-----END PUBLIC KEY-----",
     },
 }
 ```
+
+By providing a `public_key`, I don't need to trust Disco server's tunnel service
+- Later IKEA will encrypt its `client_id` and `client_secret` using my public key so that even if Disco server wants to steal IKEA's id and secret, it can't read it as plaintext
+- When IKEA wants to exchange its `client_id`, `client_secret` and *key A* for *key B*, it will encode these information in a JSON string, encrypt it using my public key. Since Disco server doesn't have IKEA's id and secret as plaintext, it can does nothing but honestly pass the data without changing a byte because changing any information would result in an unreadable response received by me, which I will of course reject.
 
 5. Disco server receives the POST request from me, it will do these things:
 
@@ -130,7 +137,8 @@ Also, I assume the root domain of Disco server is `https://dis.co`
     "method": "POST",
     "json": true,
     "body": {
-        "proxy_url": "the proxy_url received from my POST request, which is https://[uid].localtunnel.me"
+        "proxy_url": "the proxy_url received from my POST request, which is https://[uid].localtunnel.me",
+        "public_key": "-----BEGIN PUBLIC KEY-----MIIBCgKCAQEAsBUse4hn0lx0AwZrH40JwFJMrgJCEh7mg7U\PHtrydJjs5utv279reBqO6kZiXSN4dhIgN3fg9jxvwQcDDs46nKDozNbmjp1jPxYwHVGYk91Rhvspcuh5CZlQIZp9KjRH9lG0tjolyNOQEDsPQH5Oc6f9NPIcOALrWQ++wLX7nVbe5TlsZv0Lz/wJJqafCLtjEW5LuHsIwyg+h3Vkf5xKahpwLEHcX1rFyvc0FPy9QALzycrtKzXpq6WZ/pco++wt+E/iZIXFApCZILacK/xoHKbZipYoPPJBjpHD8/5nqB9Bj1rRNgPeMtNTnbBbktvXshjoy5dQtNr3qygGB1cywIDAQAB-----END PUBLIC KEY-----",
     }
 }
 ```
@@ -148,27 +156,74 @@ Also, I assume the root domain of Disco server is `https://dis.co`
 
 If IKEA has never contacted me before, it needs to register itself on my Disco app first:
 
+- Encode the following JSON to a string, then encrypt it using `public_key` to JSON `p` (because the mathematical limitation of RSA algorithm, it is impossible to directly encrypt a message that's too long, so we randomly generate a 16-byte long key and 16-byte long initialization vector, using [AES-CBC](https://tools.ietf.org/html/rfc3602), a symmetric encryption algorithm with no length limitation to encrypt the message, then use the public key to encrypt these two short strings.)
+
+```json
+{
+    "state": "a random string",
+    "client_id": "IKEA's ID (encrypted with public_key received earilier)",
+    "client_secret": "secret (encrypted)",
+    "client_name": "IKEA (optional)",
+    "is_trusted": false,
+    "challenge": "decrypted encrypted c  // since IKEA only received the encrypted c, it should be able to decrypt it and send it back to me for verification, also this challenge can be in the query parameters, storing non-standard information in headers is a bit strange, will change later"
+}
+```
+
+The resulting JSON `p` should be in the format and look like:
+
+```json
+{
+    "key": "Q8ZtJzfYq_RwYndUaW98_3Xzq1mjK-CSXlB-dhGtl_rIPPZ1SwIMoX5VnhjL3mBe0SMv5LjJxf5caJtp30O6lt599o6emGJ8FWF7SoKdNnfhAFn3MRcyOqw9je1-SM0e9C29kP2VrtereJcU0s21Z0xuu1nBSArnEVlawu_OfbZJPubCn9yg-Bvgu0kLzGgN2UUmU5qFCKZt9bGhCIP-S1xcQfoYm9o1B60b5QPVDTa1qPs6h6ewJVPShPRrT-FlSuEnTiRInZGoxwjQhoV6Xak0sNypOHfkQf_HLrl4GoNut-hJ2aTZot-rwNg-Q2RjTXXY8bXExw0XySk77r990A==",
+    "iv": "dD_-nInLEq3s-AUVpl91R9ap_FWtLDEYsz4IR7IkLgCUPjf-z6k_Ht-vQyCyGcJPtwSNR8QHSQDJO93-jXtxs0Rz7PtDCB5mOYSoNhdQiTQemfk4cz1y5SxHaCA10SZExH2MsTanwlCghKQqU7tbfubWTfiLT1qCbeLrg3pRB5WXUJQcD6GaOW9FLX7yxKhjrqJ19xpVp0vdGdndKwsjLSpMZEfrygH2ANC5-6dbNHM32X1gGK609HPB-N4sPN8xAcd3HQgc4qW7xpxkc2fqljmDZDVniclBogd0Kaw9tull7u_3r_-j4-SDvfDiyz68S7caSjyKWOd8hZrqoG8I1g==",
+    "encrypted": "A/za/mN2itMIZNiRYGq0IUFeYgfcqary0AOyoa0DgKolqO+qVXu0NUaLfOU46jf/I0LyifAUiX7GK5eFy3NUOvEouW1nqf8IgdiN8S0srYgcpKLzeDfSpk3WPNlIPgiIFMhzNSVwlVYHKE8cRQezU3R6qrSYK2MwOS1SmI5Fzs3N3dRjAPUC247XVzqJz9nysWaFBJtNM6f2+IwOCWqlPQ=="
+}
+```
+
+**Note:** all byte array data, if without mentioning, are encoded in Base64.
+
 - Send an HTTP request to `proxy_url` (i.e. a tunnel to localhost:3000, where the OAuth 2.0 service is running on my phone) with the following config:
 
 ```json
 {
-    "method": "GET",
+    "method": "POST",
     "path": "/auth/register",
-    "query_params": {
-        "state": "a random string",
-        "client_id": "IKEA's ID",
-        "client_secret": "secret // client_id and secret is no different from username and password, so IKEA is free to generate these randomly as long as it keeps the record in its database and use the same pair of username&password to authenticate itself for the same user (me) next time",
-        "client_name": "IKEA (optional)",
-        "is_trusted": false
-    },
     "headers": {
-        "content-type": "text/plain",
-        "challenge": "decrypted encrypted c  // since IKEA only received the encrypted c, it should be able to decrypt it and send it back to me for verification, also this challenge can be in the query parameters, storing non-standard information in headers is a bit strange, will change later"
+        "content-type": "application/json",
+    },
+    "body": {
+        "data": `p`
     }
 }
 ```
 
 If I accepted the registration request, IKEA would receive a 200 OK response so that they can proceed to request for *key A*:
+
+- Encode the following JSON to a string, then encrypt it using `public_key` to JSON `s` in a similar way mentioned above
+
+**Note:** 
+
+- The scope should be encoded in this way: every scope is one word without "+" inside the word, and use "+" to connect different scopes.
+- If the scope does not contain keyword `key_b`, it would be considered a request for *key B* instead of *key A*
+
+```json
+{
+    "client_id": "IKEA's ID (encrypted)",
+    "client_secret": "secret (encrypted)",
+    "response_type": "token",
+    "redirect_uri": "https://ikea.com/redirect",
+    "scope": "key_b+address",
+}
+```
+
+The resulting JSON `s` should be in the format and look like:
+
+```json
+{
+    "key": "Oe1l4RqZY-5G0ZWh9GX_R4M87aKc-w3uJQEfH1_nSRLdVxMy6DmTIgHfI97oyhAbDvpPaSbS9kv0sqGKZf_Gj1W57E8GV7mN3zRbCUeyUG7Kjps_ii6ABoVbt4iXYAPT_-v0O_8CQtldv9iDWgmh0Rr2u-TaZIqFljtsxoVd5rp4GLybHoGRWktxWWvI9aLfKiVyIMsftiVNJzJASFnewI1T6UcubhPrtqyX1xACpBrOJ3a-ZJLk6D-SGtMOb7MEvrDqAryGZiwasCM83a5Czrxlj9lSJPupZM8VulnCghd3gAuxa6LnDeRNjbvQr2SoIBivWc6W05hS4fs40O1iNg==",
+    "iv": "LcZLp2Uy0hwnuB4sl5ha46fMCTqBUnxZ-iZM8B3lQBp5MxGreHXgEjwUuOQ2FkJOtprxguSvwAj6FeF9rARkKK7TmPBQ6D3PCsLnRE95Vo-4QzZq5kNizT-A7EEH1TRJiz0i_M4OACbgarb0DV2nXdyKkC-9zl70Ghi6HvDlOsnwQ9IM3SB0jk5lcdZ7-FsWoEZPnBHr7HzjoVPQBigQ2nOSkn8CPK0m0e-VDhI6C0hPNq31o716USWDNcDv8ko7GQwCSt0o2vqv9A1xEYXZggQDjPu9wjeI0cEuTq_Gozkx3XjOhWCTf9-dpMctimXOsq9Jokk4jbmibPkWdWaNYw==",
+    "encrypted": "KRscl3hxHhgho4ZvpenNS+ov1Ud7aAlnKtXthOxi+xu8YTjukrhrFEHU/B9Sk7UrgmvIj0qzyWwRyIkACPHwgkq+5eFYmb7a43kZbM/I+GJMPtUTYVuUuTL+/XaIxbpyymGaoFIGOB8ZGfhxNSRXWP8Zpif48FgruUD9DS0fQwNodFR3tEqjrSNxg/C1wR4a"
+}
+```
 
 - Send an HTTP request to `proxy_url` with the following config:
 
@@ -178,21 +233,25 @@ If I accepted the registration request, IKEA would receive a 200 OK response so 
     "method": "GET",
     "query_params": {
         "state": "another random string",
-        "client_id": "IKEA's ID",
-        "client_secret": "secret",
         "client_name": "IKEA (optional)",
-        "response_type": "token",
-        "redirect_uri": "https://ikea.com/redirect   // this can be anything as we won't follow the redirect anyways, but it provides an alternative way of handling the callback",
-        "scope": "key_b+address",
+        "data": `s`
     },
     "followAllRedirects": false
 }
 ```
 
-If I accepted the *key A* request, IKEA would receive a 302 redirect with its request key inside. A sample response is as follows:
+If I accepted the *key A* request, IKEA would receive a JSON response with its request key inside. A sample response is as follows:
 
 ```json
-// will add the sample response later
+{
+    "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vMTI3LjAuMC4xOjMwMDAiLCJleHAiOjE1NTkyMDc5MjEsImlhdCI6MTU1OTIwNzg2MSwiYXVkIjoiaHR0cDovLzEyNy4wLjAuMTozMDAwIiwic3ViIjoiSUtFQSdzIElEIiwic2NvcGVzIjpbImtleV9iIiwiYWRkcmVzcyJdfQ.prdN7JH0FljxBDMKdyywws8WX-3XonErvuQnc7HUh5s",
+    "token_type": "bearer",
+    "expires_in": 60,
+    "scope": [
+        "key_b",
+        "address"
+    ]
+}
 ```
 
 Note that the key is encoded and signed in [JSON Web Tokens](jwt.io) format so that we can make sure the scope, audience, expire time, everything about our token is not changed by anyone because we signed the token using a key known only to us. You may refer to the website for more information.
@@ -201,7 +260,21 @@ Note that the key is encoded and signed in [JSON Web Tokens](jwt.io) format so t
 
 // Add how IKEA finds me here, later
 
-It is very similar to requesting *key A*, just the scope is different:
+- Encode the following JSON to a string, then encrypt it using `public_key` to JSON `ss`
+
+```json
+{
+    "access_token": "key A received earilier",
+    "client_id": "IKEA's ID",
+    "client_secret": "secret",
+    "response_type": "token",
+    "redirect_uri": "https://ikea.com/redirect",
+    "scope": "address",
+    "audience": "Singpost",
+}
+```
+
+- Send an HTTP request to `proxy_url` with the following config:
 
 ```json
 {
@@ -209,26 +282,28 @@ It is very similar to requesting *key A*, just the scope is different:
     "method": "GET",
     "query_params": {
         "state": "another random string",
-        "client_id": "IKEA's ID",
-        "client_secret": "secret",
         "client_name": "IKEA (optional)",
-        "response_type": "token",
-        "redirect_uri": "https://ikea.com/redirect",
-        "scope": "address",
-        "audience": "Singpost",
-        "certificate": "Singpost's certificate (optional, if the company wants to inform the user they only intend to share his address with Singpost it can add these extra information, but user's will decide in the end)"  
+        "certificate": "Singpost's certificate (optional, if the company wants to inform the user they only intend to share his address with Singpost it can add these extra information, but user's will decide in the end)",
+        "data": `ss`
     },
     "followAllRedirects": false
 }
 ```
 
-If I accepted the *key B* request, IKEA would receive a 302 redirect with its request key inside. A sample response is as follows:
+If I accepted the *key B* request, IKEA would receive a JSON response with its request key inside. A sample response is as follows:
 
 ```json
-// will add the sample response later
+{
+    "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vMTI3LjAuMC4xOjMwMDAiLCJleHAiOjE1NTkyMDc5MjEsImlhdCI6MTU1OTIwNzg2MSwiYXVkIjoiaHR0cDovLzEyNy4wLjAuMTozMDAwIiwic3ViIjoiSUtFQSdzIElEIiwic2NvcGVzIjpbImtleV9iIiwiYWRkcmVzcyJdfQ.prdN7JH0FljxBDMKdyywws8WX-3XonErvuQnc7HUh5s",
+    "token_type": "bearer",
+    "expires_in": 36000,
+    "scope": [
+        "address"
+    ]
+}
 ```
 
-// Add how IKEA transfers *key B* to Singpost, later
+Then IKEA sends this JSON to Singpost.
 
 #### Step 3: *Trusted Client* get the actual data
 

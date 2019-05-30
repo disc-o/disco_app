@@ -4,32 +4,48 @@ export 'package:angel_framework/http.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/material.dart';
 
 import 'package:angel_framework/angel_framework.dart';
 import 'package:angel_framework/http.dart';
 import 'package:angel_oauth2/angel_oauth2.dart' as oauth2;
 import 'package:angel_oauth2/angel_oauth2.dart';
+import 'package:corsac_jwt/corsac_jwt.dart' as jwt;
+import 'package:http_parser/http_parser.dart';
+
 import 'package:disco_app/client.dart';
 import 'package:disco_app/user.dart';
 import 'package:disco_app/widgets/drawer.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
-import 'package:http_parser/http_parser.dart';
 import 'package:disco_app/database_helper.dart' as db;
 import 'package:disco_app/util.dart' as util;
-import 'package:corsac_jwt/corsac_jwt.dart' as jwt;
 import 'package:disco_app/data.dart' as data;
-import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
-// import 'package:disco_app/widgets/verification_drawer.dart' as verify;
+import 'package:disco_app/rsa_key_helper.dart' as rsa;
 
 var htmlType = MediaType('text', 'html', {'charset': 'utf-8'});
 
 var _issuer = 'http://127.0.0.1:3000';
-var _audience = 'http://127.0.0.1:3000';
+var _audience = 'http://127.0.0.1:3001';
 var _trustedClient = 'trusted_client';
-var _infiniteDuration = 0;
+// var _infiniteDuration = 0;
 _AuthServer authServer;
+var _rsaHelper = rsa.RsaKeyHelper();
+
+Future<util.SymmetricEncrypted> _getSEParam(
+    RequestContext req, String state) async {
+  Map<String, dynamic> data = await req.parseBody().then((_) => req.bodyAsMap);
+  Map<String, dynamic> value = data.containsKey('data') ? data['data'] : null;
+  try {
+    if (value == null ||
+        value['key'] == null ||
+        value['iv'] == null ||
+        value['encrypted'] == null)
+      throw Exception('data is empty or incomplete');
+    return util.SymmetricEncrypted(
+        value['key'], value['iv'], value['encrypted']);
+  } catch (e) {
+    throw AngelHttpException.badRequest(message: e.toString());
+  }
+}
 
 Future<String> _getParam(RequestContext req, String name, String state,
     {bool body = false, bool throwIfEmpty = true}) async {
@@ -57,13 +73,32 @@ Future<String> _getParam(RequestContext req, String name, String state,
   return value;
 }
 
+Future<String> _getParamFromMap(
+    Map<String, dynamic> body, String name, String state,
+    {bool throwIfEmpty = true}) async {
+  var value = body.containsKey(name) ? body[name]?.toString() : null;
+
+  if (value?.isNotEmpty != true && throwIfEmpty) {
+    throw AuthorizationException(
+      ErrorResponse(
+        ErrorResponse.invalidRequest,
+        'Missing required parameter "$name".',
+        state,
+      ),
+      statusCode: 400,
+    );
+  }
+
+  return value;
+}
+
 bool _scopeIsKeyB(String scopes) {
   // Just make sure you don't have multiple 'key_b' =)
   return scopes.split(' ').where((t) => t == 'key_b').length == 1;
 }
 
-List<String> _getScopes(String scopes) {
-  return scopes.split(' ');
+List<String> _parseScopes(String scopes) {
+  return scopes.split('+');
 }
 
 Future closeWebServer(Future<AngelHttp> http) async {
@@ -83,41 +118,45 @@ Future<AngelHttp> startWebServer(BuildContext context,
   var _rgxBearer = RegExp(r'^[Bb]earer');
   AngelHttp http;
 
-  // // try to start the https server
-  // try {
-  //   /// loading asssets into app documents folder
-  //   var certFilename = 'cert.pem';
-  //   var keyFilename = 'key.pem';
-  //   Directory dir = await getApplicationDocumentsDirectory();
-  //   var certificateChainPath = join(dir.path, certFilename);
-  //   var serverKeyPath = join(dir.path, keyFilename);
-  //   ByteData certData = await rootBundle.load('assets/cert.pem');
-  //   ByteData keyData = await rootBundle.load('assets/key.pem');
-  //   List<int> certBytes = certData.buffer
-  //       .asUint8List(certData.offsetInBytes, certData.lengthInBytes);
-  //   List<int> keyBytes = keyData.buffer
-  //       .asUint8List(keyData.offsetInBytes, keyData.lengthInBytes);
-  //   await File(certificateChainPath).writeAsBytes(certBytes);
-  //   await File(serverKeyPath).writeAsBytes(keyBytes);
-
-  //   /// start the https server
-  //   http = AngelHttp.secure(app, certificateChainPath, serverKeyPath,
-  //       password: 'password');
-  //   await http.startServer('localhost', 3000);
-  //   print('Started HTTP server at ${http.server.address}:${http.server.port}');
-  // } catch (e) {
-  //   print(e);
-  // }
-
-  /// Then I realized that unsigned certificate might be a headache.
-  /// Since we're going to use a server to do some LAN penertration anyways,
-  /// how about we simply create HTTPS connection with that middle server,
-  /// so that things are easier... network activity happening within the device
-  /// doesn't need to be encrypted if the system itself is well-designed...
-  /// So use this service instead: https://localtunnel.github.io/www/
   http = AngelHttp(app);
   await http.startServer('localhost', 3000);
   print('Started HTTP server at ${http.server.address}:${http.server.port}');
+
+  data.keyPair =
+      await _rsaHelper.computeRSAKeyPair(_rsaHelper.getSecureRandom());
+  print('Generated key pair');
+
+  // --------------- below is for testing purposes
+
+  data.publicKeyInPemPKCS1 =
+      _rsaHelper.encodePublicKeyToPemPKCS1(data.keyPair.publicKey);
+  var my1 = jsonEncode({
+    "state": "a random string",
+    "client_id": "IKEA's ID",
+    "client_secret": "secret",
+    "client_name": "IKEA",
+    "is_trusted": false,
+    "challenge": "decrypted encrypted c"
+  });
+  var my2 = jsonEncode({
+    "client_id": "IKEA's ID",
+    "client_secret": "secret",
+    "response_type": "token",
+    "redirect_uri": "https://ikea.com/redirect",
+    "scope": "key_b+address",
+  });
+  var aa = util.SymmetricEncrypted.asymEncrypted(
+      util.encryptSymmetric(my1), _rsaHelper, data.keyPair.publicKey);
+  print(aa);
+  print(util.decryptAsymmetricallyEncryptedSE(
+      aa, _rsaHelper, data.keyPair.privateKey));
+  var bb = util.SymmetricEncrypted.asymEncrypted(
+      util.encryptSymmetric(my2), _rsaHelper, data.keyPair.publicKey);
+  print(bb);
+  print(util.decryptAsymmetricallyEncryptedSE(
+      bb, _rsaHelper, data.keyPair.privateKey));
+
+  // above is for testing purposes ---------------
 
   FutureOr<bool> invokeUserToIssueKeyB(Map<String, dynamic> tokenRecord) async {
     // Get information about the token, pop up confirmation window, request for consent, return the requested data
@@ -139,7 +178,7 @@ Future<AngelHttp> startWebServer(BuildContext context,
       ..get('/authorize', (req, res) async {
         await authServer.authorizationEndpoint(req, res);
       })
-      ..get('register', (req, res) async {
+      ..post('register', (req, res) async {
         await authServer.registerNewClient(req, res);
       });
   });
@@ -266,7 +305,7 @@ Future<AngelHttp> startWebServer(BuildContext context,
           if (await openGrantDataAccessDrawer(
               context, client, tokenRecord['scopes'].toString())) {
             Map<String, dynamic> resp = Map();
-            List<String> scopes = _getScopes(tokenRecord['scopes']);
+            List<String> scopes = _parseScopes(tokenRecord['scopes']);
             for (String s in scopes) {
               resp[s] = data.getUserData(s);
             }
@@ -307,9 +346,13 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       RequestContext req, ResponseContext res) async {
     String state = '';
     try {
-      var query = req.queryParameters;
-      state = query['state']?.toString() ?? '';
-      var clientId = await _getParam(req, 'client_id', state);
+      await req.parseBody();
+      util.SymmetricEncrypted enc = await _getSEParam(req, state);
+      var rawJsonString = util.decryptAsymmetricallyEncryptedSE(
+          enc, _rsaHelper, data.keyPair.privateKey);
+      var body = jsonDecode(rawJsonString);
+      state = body['state']?.toString() ?? '';
+      var clientId = await _getParamFromMap(body, 'client_id', state);
       try {
         var client = await authServer.findClient(clientId);
         if (client != null) {
@@ -322,14 +365,17 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       } on AngelHttpException {
         rethrow;
       }
-      var clientName = await _getParam(req, 'client_name', state);
-      var clientSecret = await _getParam(req, 'client_secret', state);
+      var clientName = body['client_name']?.toString() ?? '';
+      var clientSecret = await _getParamFromMap(body, 'client_secret', state);
       bool isTrusted =
-          await _getParam(req, 'is_trusted', state) == 'true' ? true : false;
-      bool isCertified = await checkCertificate(req);
-      await req.parseBody();
+          await _getParamFromMap(body, 'is_trusted', state) == 'true'
+              ? true
+              : false;
+      bool isCertified = await checkCertificate(req, body);
+      // await req.parseBody();
       bool accepted = await openRegisterVerificationDrawer(
-          context, clientName, isCertified, isTrusted) == true;
+              context, clientName, isCertified, isTrusted) ==
+          true;
       if (accepted) {
         String saltedPassword = util.addSalt(clientSecret);
         // print(util.matchedPassword(clientSecret, saltedPassword));
@@ -349,9 +395,103 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
     }
   }
 
-  FutureOr<bool> checkCertificate(RequestContext req) async {
-    data.challengeFromClient = req.headers['challenge'][0];
-    return data.challengeFromClient == data.challengeFromServer;
+  FutureOr<bool> checkCertificate(RequestContext req, Map body) async {
+    try {
+      data.challengeFromClient = body['challenge'];
+      print(data.challengeFromClient);
+      return data.challengeFromClient == data.challengeFromServer;
+    } catch (e) {
+      throw AuthorizationException(ErrorResponse(
+          ErrorResponse.invalidRequest, 'No challenge found in body', ''));
+    }
+  }
+
+  @override
+  Future<void> authorizationEndpoint(
+      RequestContext req, ResponseContext res) async {
+    String state = '';
+
+    try {
+      var query = req.queryParameters;
+      state = query['state']?.toString() ?? '';
+      var key = query['key'];
+      var iv = query['iv'];
+      var encrypted = query['encrypted'];
+      if (key == null || iv == null || encrypted == null) {
+        throw AuthorizationException(ErrorResponse(
+          ErrorResponse.invalidRequest,
+          'Invalid data query parameter',
+          state,
+        ));
+      }
+      Map<String, dynamic> body;
+      try {
+        var enc = util.SymmetricEncrypted(key, iv, encrypted);
+        var rawJsonString = util.decryptAsymmetricallyEncryptedSE(
+            enc, _rsaHelper, data.keyPair.privateKey);
+        body = jsonDecode(rawJsonString);
+        print(body);
+      } catch (e) {
+        throw AuthorizationException(ErrorResponse(
+          ErrorResponse.invalidRequest,
+          e.toString(),
+          state,
+        ));
+      }
+      var responseType = await _getParamFromMap(body, 'response_type', state);
+
+      // req.container.registerLazySingleton<Pkce>((_) {
+      //   return Pkce.fromJson(req.queryParameters, state: state);
+      // });
+
+      if (responseType == 'code' || responseType == 'token') {
+        // Ensure client ID
+        var clientId = await _getParamFromMap(body, 'client_id', state);
+
+        // Find client
+        var client = await findClient(clientId);
+
+        if (client == null) {
+          throw AuthorizationException(ErrorResponse(
+            ErrorResponse.unauthorizedClient,
+            'Unknown client "$clientId".',
+            state,
+          ));
+        }
+
+        // Grab redirect URI
+        var redirectUri = await _getParamFromMap(body, 'redirect_uri', state);
+
+        // Grab scopes
+        var rawScopes = await _getParamFromMap(body, 'scope', state);
+        print(rawScopes);
+        var scopes = _parseScopes(rawScopes);
+
+        return await requestAuthorizationCode(client, redirectUri, scopes,
+            state, req, res, responseType == 'token');
+      }
+
+      throw AuthorizationException(
+          ErrorResponse(
+            ErrorResponse.invalidRequest,
+            'Invalid or no "response_type" parameter provided',
+            state,
+          ),
+          statusCode: 400);
+    } on AngelHttpException {
+      rethrow;
+    } catch (e, st) {
+      throw AuthorizationException(
+        ErrorResponse(
+          ErrorResponse.serverError,
+          'Internal server error',
+          state,
+        ),
+        error: e,
+        statusCode: 500,
+        stackTrace: st,
+      );
+    }
   }
 
   @override
@@ -364,8 +504,18 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       ResponseContext res,
       bool implicit) async {
     if (implicit) {
+      var query = req.queryParameters;
+      state = query['state']?.toString() ?? '';
+      var key = query['key'];
+      var iv = query['iv'];
+      var encrypted = query['encrypted'];
+      Map<String, dynamic> body;
+      var enc = util.SymmetricEncrypted(key, iv, encrypted);
+      var rawJsonString = util.decryptAsymmetricallyEncryptedSE(
+          enc, _rsaHelper, data.keyPair.privateKey);
+      body = jsonDecode(rawJsonString);
       // First verify the identity of client requesting for token
-      var clientSecret = await _getParam(req, 'client_secret', state);
+      var clientSecret = await _getParamFromMap(body, 'client_secret', state);
       if (!util.matchedPassword(clientSecret, client.secret)) {
         throw oauth2.AuthorizationException(
           oauth2.ErrorResponse(oauth2.ErrorResponse.unauthorizedClient,
@@ -394,11 +544,24 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
               client.id,
               scopes.reduce((a, b) => a + ' ' + b),
               expireDuration.inSeconds);
+          Uri uri = super.completeImplicitGrant(
+              oauth2.AuthorizationTokenResponse(signedJwt,
+                  expiresIn: expireDuration.inSeconds, scope: scopes),
+              Uri.parse(redirectUri));
+          // I should redirect here... but for some unknown reason the client cannot
+          // receive the redirects, so instead I write the data back...
+          // res..redirect(uri);
+          print(uri);
+          // res..json({uri: uri});
           res
-            ..redirect(super.completeImplicitGrant(
-                oauth2.AuthorizationTokenResponse(signedJwt,
-                    expiresIn: expireDuration.inSeconds, scope: scopes),
-                Uri.parse(redirectUri)));
+            ..contentType =
+                MediaType('application', 'json', {'charset': 'utf-8'})
+            ..write(jsonEncode({
+              'access_token': signedJwt,
+              'token_type': 'bearer',
+              'expires_in': expireDuration.inSeconds,
+              'scope': scopes
+            }));
         } else {
           throw oauth2.AuthorizationException(
             oauth2.ErrorResponse(oauth2.ErrorResponse.unauthorizedClient,
@@ -428,11 +591,6 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
         await db.DatabaseHelper.instance.selectClientByClientId(clientId);
     if (list.length != 1) {
       return null;
-      // throw oauth2.AuthorizationException(
-      //   oauth2.ErrorResponse(
-      //       oauth2.ErrorResponse.unauthorizedClient, 'Invalid client', ''),
-      //   statusCode: 404,
-      // );
     } else {
       var res = list[0];
       return Client(
@@ -442,7 +600,6 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
           isTrusted: res['is_trusted'] == 1,
           publicKey: res['public_key'] ?? '');
     }
-    // return Client(id: '0', name: 'client', secret: 'secret', isTrusted: false, publicKey: 'key');
   }
 
   @override

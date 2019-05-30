@@ -84,9 +84,28 @@ class RsaKeyHelper {
   String sign(String plainText, RSAPrivateKey privateKey) {
     var signer = RSASigner(SHA256Digest(), "0609608648016503040201");
     signer.init(true, PrivateKeyParameter<RSAPrivateKey>(privateKey));
-    return  base64Encode(signer.generateSignature(createUint8ListFromString(plainText)).bytes);
+    return base64Encode(
+        signer.generateSignature(createUint8ListFromString(plainText)).bytes);
   }
 
+  /// Encrypts [text] and return the result using Base64Url codec
+  String encryptAsymmetric(String text, RSAPublicKey publicKey) {
+    AsymmetricKeyParameter<RSAPublicKey> keyParametersPublic =
+        PublicKeyParameter(publicKey);
+    var cipher = RSAEngine()..init(true, keyParametersPublic);
+    var cipherText = cipher.process(Uint8List.fromList(text.codeUnits));
+    return base64UrlEncode(cipherText);
+  }
+
+  /// Decrypts [cipherTextBase64] which uses Base64 codec
+  String decryptAsymmetric(String cipherTextBase64, RSAPrivateKey privateKey) {
+    AsymmetricKeyParameter<RSAPrivateKey> keyParametersPrivate =
+        PrivateKeyParameter(privateKey);
+    var cipher = RSAEngine()..init(false, keyParametersPrivate);
+    var decrypted =
+        cipher.process(Uint8List.fromList(base64Decode(cipherTextBase64)));
+    return String.fromCharCodes(decrypted);
+  }
 
   /// Creates a [Uint8List] from a string to be signed
   Uint8List createUint8ListFromString(String s) {
@@ -184,7 +203,6 @@ class RsaKeyHelper {
   ///
   /// Given [RSAPrivateKey] returns a base64 encoded [String] with standard PEM headers and footers
   String encodePrivateKeyToPemPKCS1(RSAPrivateKey privateKey) {
-
     var topLevel = new ASN1Sequence();
 
     var version = ASN1Integer(BigInt.from(0));

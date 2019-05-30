@@ -1,5 +1,6 @@
 import 'package:disco_app/client.dart';
 import 'package:disco_app/user.dart';
+import "package:pointycastle/export.dart";
 
 List<Client> clients = [
   Client(id: '1', name: 'client1'),
@@ -24,3 +25,9 @@ String referralCode = '';
 
 String challengeFromServer = '';
 String challengeFromClient = '';
+
+AsymmetricKeyPair<PublicKey, PrivateKey> keyPair;
+String publicKeyInPemPKCS1;
+
+String publicKeyFromClient;
+String certificateFromClient;
