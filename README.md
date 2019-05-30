@@ -1,6 +1,6 @@
-# disco_app
+# Disco App
 
-A Decentralized Self-contained OAuth 2.0 Service.
+A Decentralized Self-contained OAuth-2.0-like Service, running on both Android and iOS.
 
 ## Getting Started
 
@@ -186,6 +186,11 @@ If I accepted the registration request, IKEA would receive a 200 OK response so 
 
 - Encode the following JSON to a string, then encrypt it using `public_key` to string `s`
 
+**Note:** 
+
+- The scope should be encoded in this way: every scope is one word without "+" inside the word, and use "+" to connect different scopes.
+- If the scope does not contain keyword `key_b`, it would be considered a request for *key B* instead of *key A*
+
 ```json
 {
     "client_id": "IKEA's ID (encrypted)",
@@ -211,10 +216,18 @@ If I accepted the registration request, IKEA would receive a 200 OK response so 
 }
 ```
 
-If I accepted the *key A* request, IKEA would receive a 302 redirect with its request key inside. A sample response is as follows:
+If I accepted the *key A* request, IKEA would receive a JSON response with its request key inside. A sample response is as follows:
 
 ```json
-// will add the sample response later
+{
+    "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vMTI3LjAuMC4xOjMwMDAiLCJleHAiOjE1NTkyMDc5MjEsImlhdCI6MTU1OTIwNzg2MSwiYXVkIjoiaHR0cDovLzEyNy4wLjAuMTozMDAwIiwic3ViIjoiSUtFQSdzIElEIiwic2NvcGVzIjpbImtleV9iIiwiYWRkcmVzcyJdfQ.prdN7JH0FljxBDMKdyywws8WX-3XonErvuQnc7HUh5s",
+    "token_type": "bearer",
+    "expires_in": 60,
+    "scope": [
+        "key_b",
+        "address"
+    ]
+}
 ```
 
 Note that the key is encoded and signed in [JSON Web Tokens](jwt.io) format so that we can make sure the scope, audience, expire time, everything about our token is not changed by anyone because we signed the token using a key known only to us. You may refer to the website for more information.
@@ -253,13 +266,20 @@ Note that the key is encoded and signed in [JSON Web Tokens](jwt.io) format so t
 }
 ```
 
-If I accepted the *key B* request, IKEA would receive a 302 redirect with its request key inside. A sample response is as follows:
+If I accepted the *key B* request, IKEA would receive a JSON response with its request key inside. A sample response is as follows:
 
 ```json
-// will add the sample response later
+{
+    "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vMTI3LjAuMC4xOjMwMDAiLCJleHAiOjE1NTkyMDc5MjEsImlhdCI6MTU1OTIwNzg2MSwiYXVkIjoiaHR0cDovLzEyNy4wLjAuMTozMDAwIiwic3ViIjoiSUtFQSdzIElEIiwic2NvcGVzIjpbImtleV9iIiwiYWRkcmVzcyJdfQ.prdN7JH0FljxBDMKdyywws8WX-3XonErvuQnc7HUh5s",
+    "token_type": "bearer",
+    "expires_in": 36000,
+    "scope": [
+        "address"
+    ]
+}
 ```
 
-// Add how IKEA transfers *key B* to Singpost, later
+Then IKEA sends this JSON to Singpost.
 
 #### Step 3: *Trusted Client* get the actual data
 

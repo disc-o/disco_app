@@ -8,8 +8,8 @@ import 'package:dio/dio.dart';
 
 TextStyle get whiteTextStyle => TextStyle(color: Colors.white);
 
-var _discoServer = '127.0.0.1';
-var _discoServerPort = 3001;
+// var _discoServer = '127.0.0.1';
+// var _discoServerPort = 3001;
 var _uidUrl = 'http://127.0.0.1:3001/uid';
 
 class ServerPage extends StatefulWidget {
