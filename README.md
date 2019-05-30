@@ -113,13 +113,18 @@ Also, I assume the root domain of Disco server is `https://dis.co`
 
 ```json
 {
-    "method": "PUT",
+    "method": "POST",
     "body": {
         "uid": "the uid I just pasted",
-        "proxy_url": "https://[uid].localtunnel.me"
+        "proxy_url": "https://[uid].localtunnel.me",
+        "public_key": "-----BEGIN PUBLIC KEY-----MIIBCgKCAQEAsBUse4hn0lx0AwZrH40JwFJMrgJCEh7mg7U\PHtrydJjs5utv279reBqO6kZiXSN4dhIgN3fg9jxvwQcDDs46nKDozNbmjp1jPxYwHVGYk91Rhvspcuh5CZlQIZp9KjRH9lG0tjolyNOQEDsPQH5Oc6f9NPIcOALrWQ++wLX7nVbe5TlsZv0Lz/wJJqafCLtjEW5LuHsIwyg+h3Vkf5xKahpwLEHcX1rFyvc0FPy9QALzycrtKzXpq6WZ/pco++wt+E/iZIXFApCZILacK/xoHKbZipYoPPJBjpHD8/5nqB9Bj1rRNgPeMtNTnbBbktvXshjoy5dQtNr3qygGB1cywIDAQAB-----END PUBLIC KEY-----",
     },
 }
 ```
+
+By providing a `public_key`, I don't need to trust Disco server's tunnel service
+- Later IKEA will encrypt its `client_id` and `client_secret` using my public key so that even if Disco server wants to steal IKEA's id and secret, it can't read it as plaintext
+- When IKEA wants to exchange its `client_id`, `client_secret` and *key A* for *key B*, it will encode these information in a JSON string, encrypt it using my public key. Since Disco server doesn't have IKEA's id and secret as plaintext, it can does nothing but honestly pass the data without changing a byte because changing any information would result in an unreadable response received by me, which I will of course reject.
 
 5. Disco server receives the POST request from me, it will do these things:
 
@@ -130,7 +135,8 @@ Also, I assume the root domain of Disco server is `https://dis.co`
     "method": "POST",
     "json": true,
     "body": {
-        "proxy_url": "the proxy_url received from my POST request, which is https://[uid].localtunnel.me"
+        "proxy_url": "the proxy_url received from my POST request, which is https://[uid].localtunnel.me",
+        "public_key": "-----BEGIN PUBLIC KEY-----MIIBCgKCAQEAsBUse4hn0lx0AwZrH40JwFJMrgJCEh7mg7U\PHtrydJjs5utv279reBqO6kZiXSN4dhIgN3fg9jxvwQcDDs46nKDozNbmjp1jPxYwHVGYk91Rhvspcuh5CZlQIZp9KjRH9lG0tjolyNOQEDsPQH5Oc6f9NPIcOALrWQ++wLX7nVbe5TlsZv0Lz/wJJqafCLtjEW5LuHsIwyg+h3Vkf5xKahpwLEHcX1rFyvc0FPy9QALzycrtKzXpq6WZ/pco++wt+E/iZIXFApCZILacK/xoHKbZipYoPPJBjpHD8/5nqB9Bj1rRNgPeMtNTnbBbktvXshjoy5dQtNr3qygGB1cywIDAQAB-----END PUBLIC KEY-----",
     }
 }
 ```
@@ -148,27 +154,47 @@ Also, I assume the root domain of Disco server is `https://dis.co`
 
 If IKEA has never contacted me before, it needs to register itself on my Disco app first:
 
+- Encode the following JSON to a string, then encrypt it using `public_key` to string `p`
+
+```json
+{
+    "state": "a random string",
+    "client_id": "IKEA's ID (encrypted with public_key received earilier)",
+    "client_secret": "secret (encrypted)",
+    "client_name": "IKEA (optional)",
+    "is_trusted": false,
+    "challenge": "decrypted encrypted c  // since IKEA only received the encrypted c, it should be able to decrypt it and send it back to me for verification, also this challenge can be in the query parameters, storing non-standard information in headers is a bit strange, will change later"
+}
+```
+
 - Send an HTTP request to `proxy_url` (i.e. a tunnel to localhost:3000, where the OAuth 2.0 service is running on my phone) with the following config:
 
 ```json
 {
-    "method": "GET",
+    "method": "POST",
     "path": "/auth/register",
-    "query_params": {
-        "state": "a random string",
-        "client_id": "IKEA's ID",
-        "client_secret": "secret // client_id and secret is no different from username and password, so IKEA is free to generate these randomly as long as it keeps the record in its database and use the same pair of username&password to authenticate itself for the same user (me) next time",
-        "client_name": "IKEA (optional)",
-        "is_trusted": false
-    },
     "headers": {
-        "content-type": "text/plain",
-        "challenge": "decrypted encrypted c  // since IKEA only received the encrypted c, it should be able to decrypt it and send it back to me for verification, also this challenge can be in the query parameters, storing non-standard information in headers is a bit strange, will change later"
+        "content-type": "application/json",
+    },
+    "body": {
+        "data": `p`
     }
 }
 ```
 
 If I accepted the registration request, IKEA would receive a 200 OK response so that they can proceed to request for *key A*:
+
+- Encode the following JSON to a string, then encrypt it using `public_key` to string `s`
+
+```json
+{
+    "client_id": "IKEA's ID (encrypted)",
+    "client_secret": "secret (encrypted)",
+    "response_type": "token",
+    "redirect_uri": "https://ikea.com/redirect",
+    "scope": "key_b+address",
+}
+```
 
 - Send an HTTP request to `proxy_url` with the following config:
 
@@ -178,12 +204,8 @@ If I accepted the registration request, IKEA would receive a 200 OK response so 
     "method": "GET",
     "query_params": {
         "state": "another random string",
-        "client_id": "IKEA's ID",
-        "client_secret": "secret",
         "client_name": "IKEA (optional)",
-        "response_type": "token",
-        "redirect_uri": "https://ikea.com/redirect   // this can be anything as we won't follow the redirect anyways, but it provides an alternative way of handling the callback",
-        "scope": "key_b+address",
+        "data": `s`
     },
     "followAllRedirects": false
 }
@@ -201,7 +223,21 @@ Note that the key is encoded and signed in [JSON Web Tokens](jwt.io) format so t
 
 // Add how IKEA finds me here, later
 
-It is very similar to requesting *key A*, just the scope is different:
+- Encode the following JSON to a string, then encrypt it using `public_key` to string `ss`
+
+```json
+{
+    "access_token": "key A received earilier",
+    "client_id": "IKEA's ID",
+    "client_secret": "secret",
+    "response_type": "token",
+    "redirect_uri": "https://ikea.com/redirect",
+    "scope": "address",
+    "audience": "Singpost",
+}
+```
+
+- Send an HTTP request to `proxy_url` with the following config:
 
 ```json
 {
@@ -209,14 +245,9 @@ It is very similar to requesting *key A*, just the scope is different:
     "method": "GET",
     "query_params": {
         "state": "another random string",
-        "client_id": "IKEA's ID",
-        "client_secret": "secret",
         "client_name": "IKEA (optional)",
-        "response_type": "token",
-        "redirect_uri": "https://ikea.com/redirect",
-        "scope": "address",
-        "audience": "Singpost",
-        "certificate": "Singpost's certificate (optional, if the company wants to inform the user they only intend to share his address with Singpost it can add these extra information, but user's will decide in the end)"  
+        "certificate": "Singpost's certificate (optional, if the company wants to inform the user they only intend to share his address with Singpost it can add these extra information, but user's will decide in the end)",
+        "data": `ss`
     },
     "followAllRedirects": false
 }
