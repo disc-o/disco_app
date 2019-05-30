@@ -88,20 +88,31 @@ class RsaKeyHelper {
         signer.generateSignature(createUint8ListFromString(plainText)).bytes);
   }
 
-  String encrypt(String text, RSAPublicKey publicKey) {
+  /// Encrypt will encrypt [text] and return an encoded JSON string containing all the numbers
+  /// e.g. "[99,244,182,55,121,43,193,173,236,149,219,228,245,37,189,116,124,127,241,117,157,13,
+  /// 94,65,89,159,109,214,175,173,33,135,132,116,69,193,163,106,150,164,93,146,2,195,7,169,195,
+  /// 47,70,81,86,198,137,247,54,193,144,187,78,156,209,83,65,198,46,106,165,239,204,172,52,155,
+  /// 70,68,189,235,83,137,87,229,181,46,58,241,233,44,158,211,192,165,103,237,64,146,233,56,166,
+  /// 69,61,123,184,124,63,152,166,95,151,2,160,59,142,121,251,221,231,141,208,91,9,202,100,235,
+  /// 50,244,174,14,172,25,10,254,244,110,230,142,48,227,71,20,117,44,101,21,166,255,221,22,129,
+  /// 102,163,77,43,168,143,253,162,28,193,45,31,104,132,24,201,157,241,124,13,94,204,107,176,
+  /// 186,149,64,251,24,169,150,158,45,116,229,198,246,234,93,119,55,70,242,144,137,222,59,160,
+  /// 148,232,174,224,221,50,210,84,60,214,98,109,184,16,32,83,203,10,167,179,40,133,246,83,120,
+  /// 172,96,135,223,76,63,234,250,88,228,14,121,125,111,122,255,31,129,16,172,63,96,152,200,112,
+  /// 170,24,190,66,208,133,62,153,36,249,20]"
+  List<int> encrypt(String text, RSAPublicKey publicKey) {
     AsymmetricKeyParameter<RSAPublicKey> keyParametersPublic =
         PublicKeyParameter(publicKey);
     var cipher = RSAEngine()..init(true, keyParametersPublic);
-    var cipherText =
-        cipher.process(Uint8List.fromList("Hello world".codeUnits));
-    return String.fromCharCodes(cipherText);
+    var cipherText = cipher.process(Uint8List.fromList(text.codeUnits));
+    return cipherText.toList();
   }
 
-  String decrypt(String cipherText, RSAPrivateKey privateKey) {
+  String decrypt(List<int> cipherText, RSAPrivateKey privateKey) {
     AsymmetricKeyParameter<RSAPrivateKey> keyParametersPrivate =
         PrivateKeyParameter(privateKey);
     var cipher = RSAEngine()..init(false, keyParametersPrivate);
-    var decrypted = cipher.process(Uint8List.fromList(cipherText.codeUnits));
+    var decrypted = cipher.process(Uint8List.fromList(cipherText));
     return String.fromCharCodes(decrypted);
   }
 

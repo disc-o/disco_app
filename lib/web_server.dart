@@ -30,6 +30,19 @@ var _infiniteDuration = 0;
 _AuthServer authServer;
 var _rsaHelper = rsa.RsaKeyHelper();
 
+List<int> _parseListOfInt(String encoded) {
+  try {
+    List t = jsonDecode(encoded);
+    List<int> k = List();
+    for (var p in t) {
+      if (p is int) k.add(p);
+    }
+    return k;
+  } catch (e) {
+    throw AngelHttpException.badRequest();
+  }
+}
+
 Future<String> _getParam(RequestContext req, String name, String state,
     {bool body = false, bool throwIfEmpty = true}) async {
   Map<String, dynamic> data;
@@ -155,6 +168,17 @@ Future<AngelHttp> startWebServer(BuildContext context,
   print('Generated key pair');
   data.publicKeyInPemPKCS1 =
       _rsaHelper.encodePublicKeyToPemPKCS1(data.keyPair.publicKey);
+  var my1 = jsonEncode({
+    "state": "a random string",
+    "client_id": "IKEA's ID",
+    "client_secret": "secret",
+    "client_name": "IKEA",
+    "is_trusted": false,
+    "challenge": "decrypted encrypted c"
+  });
+  var cipherText = _rsaHelper.encrypt(my1, data.keyPair.publicKey);
+  var encoded = jsonEncode(cipherText);
+  print(_rsaHelper.decrypt(_parseListOfInt(encoded), data.keyPair.privateKey));
 
   FutureOr<bool> invokeUserToIssueKeyB(Map<String, dynamic> tokenRecord) async {
     // Get information about the token, pop up confirmation window, request for consent, return the requested data
@@ -345,7 +369,8 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
     String state = '';
     try {
       await req.parseBody();
-      var rawData = await _getParam(req, 'data', state, body: true);
+      var rawData =
+          _parseListOfInt(await _getParam(req, 'data', state, body: true));
       var rawJsonString = _rsaHelper.decrypt(rawData, data.keyPair.privateKey);
       var body = jsonDecode(rawJsonString);
       state = body['state']?.toString() ?? '';
@@ -411,7 +436,7 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
     try {
       var query = req.queryParameters;
       state = query['state']?.toString() ?? '';
-      var rawData = query['data'];
+      List<int> rawData = _parseListOfInt(query['data']);
       if (rawData == null) {
         throw AuthorizationException(ErrorResponse(
           ErrorResponse.invalidRequest,
