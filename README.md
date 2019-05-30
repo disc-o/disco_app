@@ -2,6 +2,8 @@
 
 A Decentralized Self-contained OAuth-2.0-like Service, running on both Android and iOS.
 
+This service aims to achieve all-round control over personal information by letting mobile devices to act as authorization servers hosting the information of the device's owner. End-to-end encryption means you don't even need to trust the Disco server.
+
 ## Getting Started
 
 ```bash

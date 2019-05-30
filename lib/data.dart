@@ -28,3 +28,6 @@ String challengeFromClient = '';
 
 AsymmetricKeyPair<PublicKey, PrivateKey> keyPair;
 String publicKeyInPemPKCS1;
+
+String publicKeyFromClient;
+String certificateFromClient;

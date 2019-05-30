@@ -24,24 +24,11 @@ import 'package:disco_app/rsa_key_helper.dart' as rsa;
 var htmlType = MediaType('text', 'html', {'charset': 'utf-8'});
 
 var _issuer = 'http://127.0.0.1:3000';
-var _audience = 'http://127.0.0.1:3000';
+var _audience = 'http://127.0.0.1:3001';
 var _trustedClient = 'trusted_client';
 // var _infiniteDuration = 0;
 _AuthServer authServer;
 var _rsaHelper = rsa.RsaKeyHelper();
-
-List<int> _parseListOfInt(String encoded) {
-  try {
-    List t = jsonDecode(encoded);
-    List<int> k = List();
-    for (var p in t) {
-      if (p is int) k.add(p);
-    }
-    return k;
-  } catch (e) {
-    throw AngelHttpException.badRequest();
-  }
-}
 
 Future<String> _getParam(RequestContext req, String name, String state,
     {bool body = false, bool throwIfEmpty = true}) async {
@@ -97,19 +84,6 @@ List<String> _parseScopes(String scopes) {
   return scopes.split('+');
 }
 
-// Future<Iterable<String>> _getScopes(RequestContext req,
-//     {bool body = false}) async {
-//   Map<String, dynamic> data;
-
-//   if (body == true) {
-//     data = await req.parseBody().then((_) => req.bodyAsMap);
-//   } else {
-//     data = req.queryParameters;
-//   }
-
-//   return data['scope']?.toString()?.split(' ') ?? [];
-// }
-
 Future closeWebServer(Future<AngelHttp> http) async {
   AngelHttp t = await http;
   if (t != null) {
@@ -154,11 +128,10 @@ Future<AngelHttp> startWebServer(BuildContext context,
     "redirect_uri": "https://ikea.com/redirect",
     "scope": "key_b+address",
   });
-  var cipherText = _rsaHelper.encrypt(my1, data.keyPair.publicKey);
-  var encoded = jsonEncode(cipherText);
-  print(encoded);
-  print(jsonEncode(_rsaHelper.encrypt(my2, data.keyPair.publicKey)));
-  print(_rsaHelper.decrypt(_parseListOfInt(encoded), data.keyPair.privateKey));
+  print(my1);
+  print(_rsaHelper.encrypt(my1, data.keyPair.publicKey));
+  print(my2);
+  print(_rsaHelper.encrypt(my2, data.keyPair.publicKey));
 
   // above is for testing purposes ---------------
 
@@ -351,8 +324,7 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
     String state = '';
     try {
       await req.parseBody();
-      var rawData =
-          _parseListOfInt(await _getParam(req, 'data', state, body: true));
+      var rawData = await _getParam(req, 'data', state, body: true);
       var rawJsonString = _rsaHelper.decrypt(rawData, data.keyPair.privateKey);
       var body = jsonDecode(rawJsonString);
       state = body['state']?.toString() ?? '';
@@ -418,7 +390,7 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
     try {
       var query = req.queryParameters;
       state = query['state']?.toString() ?? '';
-      List<int> rawData = _parseListOfInt(query['data']);
+      var rawData = query['data'];
       if (rawData == null) {
         throw AuthorizationException(ErrorResponse(
           ErrorResponse.invalidRequest,
@@ -508,7 +480,7 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       bool implicit) async {
     if (implicit) {
       var query = req.queryParameters;
-      List<int> rawData = _parseListOfInt(query['data']);
+      var rawData = query['data'];
       Map<String, dynamic> body;
       var rawJsonString = _rsaHelper.decrypt(rawData, data.keyPair.privateKey);
       body = jsonDecode(rawJsonString);

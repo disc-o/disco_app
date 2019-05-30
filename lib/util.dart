@@ -1,12 +1,14 @@
-export 'package:pointycastle/api.dart';
-
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
+export 'package:pointycastle/api.dart';
 import 'package:convert/convert.dart' as conv;
-
 import 'package:encrypt/encrypt.dart';
 import 'package:crypt/crypt.dart';
 import 'package:corsac_jwt/corsac_jwt.dart' as jwt;
+
+import 'package:disco_app/data.dart' as data;
 
 Random _random = Random.secure();
 
@@ -24,6 +26,25 @@ String addSalt(String password) {
   return Crypt.sha256(password,
           rounds: 10000, salt: generateCryptoRandomString())
       .toString();
+}
+
+var _uidUrl = 'http://127.0.0.1:3001/uid';
+
+Future<void> connectRemote() async {
+  HttpClient client = HttpClient();
+  var req = await client.postUrl(Uri.parse(_uidUrl));
+  req.headers.set('content-type', 'application/json');
+  req.add(utf8.encode(json.encode({
+    'uid': data.referralCode,
+    'proxy_url': data.proxyUrl,
+    'public_key': data.publicKeyInPemPKCS1
+  })));
+  var resp = await req.close();
+  print('challenge from disco server:');
+  var recv = jsonDecode(await resp.transform(utf8.decoder).join());
+  data.challengeFromServer = recv['challenge'];
+  data.publicKeyFromClient = recv['public_key'];
+  data.certificateFromClient = recv['certificate'];
 }
 
 main(List<String> args) async {
