@@ -126,4 +126,11 @@ class DatabaseHelper {
     return await db
         .query(tokenTable, where: 'token = ?', whereArgs: [jwtString]);
   }
+
+  // Future<void> updateTokenAudienceCertByJwt(
+  //     String jwtString, String audienceCertificate) async {
+  //   Database db = await instance.database;
+  //   return await db.update(tokenTable, {'audience_certificate': audienceCertificate},
+  //       where: 'token = ?', whereArgs: [jwtString]);
+  // }
 }

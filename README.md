@@ -259,7 +259,7 @@ Note that the key is encoded and signed in [JSON Web Tokens](jwt.io) format so t
 
 #### Step 2: Request and transfer *Key B*
 
-// Add how IKEA finds me here, later
+// IKEA finds me via the push notification service
 
 - Encode the following JSON to a string, then encrypt it using `public_key` to JSON `ss`
 
@@ -292,6 +292,12 @@ Note that the key is encoded and signed in [JSON Web Tokens](jwt.io) format so t
 ```
 
 If I accepted the *key B* request, IKEA would receive a JSON response with its request key inside. A sample response is as follows:
+
+```json
+{
+    "key": "
+}
+```
 
 ```json
 {

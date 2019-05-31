@@ -1,8 +1,13 @@
+import 'dart:convert';
+
 import 'package:disco_app/util.dart' as prefix0;
 import 'package:disco_app/views/certificate_detail_page.dart';
+import 'package:disco_app/web_server.dart';
 import 'package:flutter/material.dart';
 import 'package:disco_app/database_helper.dart' as db;
 import 'package:disco_app/widgets/drawer.dart' as drawer;
+import 'package:disco_app/util.dart' as util;
+import 'package:disco_app/data.dart' as data;
 
 class CertPage extends StatefulWidget {
   @override
@@ -37,7 +42,7 @@ class _CertPageState extends State<CertPage>
               MaterialButton(
                 color: Colors.blueAccent,
                 child: Text(
-                  'Query',
+                  'Parse Certificate Information',
                   style: TextStyle(color: Colors.white),
                 ),
                 onPressed: () async {
@@ -46,6 +51,31 @@ class _CertPageState extends State<CertPage>
                       context,
                       MaterialPageRoute(
                           builder: (context) => CertificateDetailPage(cert)));
+                },
+              ),
+              MaterialButton(
+                color: Colors.green,
+                child: Text(
+                  'Encrypt Key B Request',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onPressed: () {
+                  var keyBRequestInfo = jsonEncode({
+                    "access_token": _rawQuery,
+                    "client_id": "IKEA's ID",
+                    "client_secret": "secret",
+                    "response_type": "token",
+                    "redirect_uri": "https://ikea.com/redirect",
+                    "scope": "address",
+                    "audience": "Singpost",
+                  });
+                  var t1 = util.SymmetricEncrypted.asymEncrypted(
+                      util.encryptSymmetric(keyBRequestInfo),
+                      rsaHelper,
+                      data.keyPair.publicKey);
+                  print(t1);
+                  print(util.decryptAsymmetricallyEncryptedSE(
+                      t1, rsaHelper, data.keyPair.privateKey));
                 },
               ),
             ],

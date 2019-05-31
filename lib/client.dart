@@ -6,9 +6,10 @@ class Client {
   String secret;
 
   bool isTrusted;
+  String certificate;
   String publicKey;
 
-  Client({this.id, this.name, this.secret, this.isTrusted, this.publicKey});
+  Client({this.id, this.name, this.secret, this.isTrusted, this.publicKey, this.certificate});
 
   @override
   String toString() {
