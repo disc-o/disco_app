@@ -165,6 +165,7 @@ If IKEA has never contacted me before, it needs to register itself on my Disco a
     "client_secret": "secret (encrypted)",
     "client_name": "IKEA (optional)",
     "is_trusted": false,
+    "certificate": "-----BEGIN CERTIFICATE-----MIIDGTCCAgECFDJp0BJ+af9z/rLYiT7P2f+xFmQKMA0GCSqGSIb3DQEBCwUAMEkxCzAJBgNVBAYTAlNHMRIwEAYDVQQIDAlTaW5nYXBvcmUxEjAQBgNVBAcMCVNpbmdhcG9yZTESMBAGA1UECgwJRHVtbXkgQ28uMB4XDTE5MDUyODEzMzcwMVoXDTIwMDUyNzEzMzcwMVowSTELMAkGA1UEBhMCU0cxEjAQBgNVBAgMCVNpbmdhcG9yZTESMBAGA1UEBwwJU2luZ2Fwb3JlMRIwEAYDVQQKDAlEdW1teSBDby4wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDJDtjJzwW7DjZb9SreSzYE1f8S9dWoWDD9ebomDAeURUjxEp7Ww0Fr44iVqZnizilrzffrh+HxWTZSxkd42wIlzfvPdeXZYnelSBQqC3wcfZeaY7sJEDciDtnsg6gAqInToiKnX7zKL7vJQULyND+0Z3NV8ET3NnTSew40xRqxOqya3NIWaPexPcHA+kXsdgllIDUrXiyxVQT+f4g15QnTk7OVGSu2R0tUYI7BrRJeJ/6gFpr7aY3ebdUQKSAPHh5fHcehO26ti0suYjlwA7wvjZzSuFXVVo8Flt/i4Aqv65DuGqw/PWwn6xeaiZVAhY85RHqegkbdr1lX1wVwCNX5AgMBAAEwDQYJKoZIhvcNAQELBQADggEBAIPTbCUmc818sz16y30akXM+IUF5s/Sc2Fq4ZIiF8qn13XiI5s/M3IQz5RcrhU7+uAvspL4uVQZqH6ztZsnYSf+mQL563hWo0WUpx686D2ySPBnwKPLsjagCmyfwRtaKpm3zn/wXZJDl4HalQMDHv7Uy1Uy0P9BIxpMvFCFVu0eoW/5RpqLy6JtJtOFq/X0jvjRvdz1xYo19dx3FYk36sxzHm+yE4ch82jHU8tVW8+kYEDqFnrSt9KK7vDxAWT1MMD4EuknrxifHrFfxTf9WVfhsXX4WTK/QfFgQwTsSZaw/ITK7DlnX6jLae5qaZAsIOUjCViURMfSgSNVGR50S4ww=-----END CERTIFICATE-----",
     "challenge": "decrypted encrypted c  // since IKEA only received the encrypted c, it should be able to decrypt it and send it back to me for verification, also this challenge can be in the query parameters, storing non-standard information in headers is a bit strange, will change later"
 }
 ```
@@ -254,11 +255,11 @@ If I accepted the *key A* request, IKEA would receive a JSON response with its r
 }
 ```
 
-Note that the key is encoded and signed in [JSON Web Tokens](jwt.io) format so that we can make sure the scope, audience, expire time, everything about our token is not changed by anyone because we signed the token using a key known only to us. You may refer to the website for more information.
+Note that the key is encoded and signed in [JSON Web Tokens](jwt.io) format so that we can make sure the scope, audience, expire time, everything about our token is not changed by anyone because we signed the token using a key known only to us. You may refer to the website for more information. Also, according to [this answer on Stackoverflow](https://stackoverflow.com/questions/417142/what-is-the-maximum-length-of-a-url-in-different-browsers), our URL *should* be within the 2000 character limit. However we're dealing with servers instead of browsers so even if it exceeded the length limit it should be no problem....
 
 #### Step 2: Request and transfer *Key B*
 
-// Add how IKEA finds me here, later
+// IKEA finds me via the push notification service
 
 - Encode the following JSON to a string, then encrypt it using `public_key` to JSON `ss`
 
@@ -290,7 +291,7 @@ Note that the key is encoded and signed in [JSON Web Tokens](jwt.io) format so t
 }
 ```
 
-If I accepted the *key B* request, IKEA would receive a JSON response with its request key inside. A sample response is as follows:
+If I accepted the *key B* request, IKEA would receive a JSON response with its request key inside. Of course, because of the end-to-end encryption, the raw response is contains `key` and `iv` which are encrypted with IKEA's public key and a `encrypted` which an encrypted JSON string using `key` and `iv`. A sample decrypted and parsed response is as follows:
 
 ```json
 {
@@ -307,4 +308,48 @@ Then IKEA sends this JSON to Singpost.
 
 #### Step 3: *Trusted Client* get the actual data
 
-// add later
+By now you should be familiar with how end-to-end encryption works, remember whenever sends a message to me, Singpost would first stringify its JSON and encrypt it with AES and send me the encrypted `key` and `iv` using my public key, along with `encrypted`; whenever I send a message to Singpost, I would do the same using the public key from Singpost's certificate
+
+The registration process is exactly the same as IKEA's. The only difference is that Singpost requests for a *trusted client* privilege:
+
+```json
+{
+    "state": "a random string",
+    "client_id": "Singpost's ID",
+    "client_secret": "secret",
+    "client_name": "Singpost",
+    "is_trusted": true,
+    "certificate": data.sampleCertificate,
+    "challenge": "decrypted encrypted c"
+}
+```
+
+Requesting for data is exactly the same as how IKEA request for *key B*, a sample request JSON is as follows:
+
+```json
+{
+    "access_token": "key B obtained from IKEA",
+    "client_id": "IKEA's ID",
+    "client_secret": "secret",
+    "response_type": "token",
+    "redirect_uri": "https://singpost.sg/redirect",
+    "scope": "address",
+    "audience": "Singpost",
+}
+```
+
+If I approve this request, Singpost would receive my information in JSON format (encrypted with Singpost's public key of course):
+
+```json
+{
+    "address": "my address"
+}
+```
+
+## Limitations
+
+1. Since *user* doesn't have the ability to own a CA-signed certificate, Disco server cannot make sure information sent from *client* is safe. However, our system aims to protect *user*'s privacy, not the *client*'s, this is an unavoidable flaw that doesn't matter much.
+2. Currently we don't have a [localtunnel](https://localtunnel.github.io/www/) or similar tunneling client written in Dart, so this app can only run on emulators where we can forward `localhost:3000` of the emulator to `localhost:3000` of our computer, then on the computer, create a tunnel from `localhost:3000` to localtunnel's server.
+3. Currently we don't have a complete PKI utility library written in Dart. Specifically we can't parse X.509 certificate encoded in PEM within our app, so I integrated this function to [Disco server](https://github.com/disc-o/server) under POST request of `/cert` route.
+
+Clearly limitation 2 and 3 can be solved by porting the standard implementations, which takes time.

@@ -45,7 +45,8 @@ class DatabaseHelper {
               client_name   TEXT DEFAULT client_default_name  NOT NULL,
               client_secret TEXT                              NOT NULL,
               is_trusted    BOOLEAN                           NOT NULL,
-              public_key    TEXT
+              certificate   TEXT                              NOT NULL,
+              public_key    TEXT                              NOT NULL
             )
           ''');
     await db.execute('''
@@ -72,16 +73,16 @@ class DatabaseHelper {
     return await db.insert(table, row);
   }
 
-  Future<int> insertClient(
-      String clientId, String clientName, String clientSecret, bool isTrusted,
-      {String publicKey}) async {
+  Future<int> insertClient(String clientId, String clientName,
+      String clientSecret, bool isTrusted, String cert, String pk) async {
     Database db = await instance.database;
     return await db.insert(clientTable, {
       'client_id': clientId,
       'client_name': clientName,
       'client_secret': clientSecret,
       'is_trusted': isTrusted,
-      'public_key': publicKey
+      'certificate': cert,
+      'public_key': pk
     });
   }
 
@@ -125,4 +126,11 @@ class DatabaseHelper {
     return await db
         .query(tokenTable, where: 'token = ?', whereArgs: [jwtString]);
   }
+
+  // Future<void> updateTokenAudienceCertByJwt(
+  //     String jwtString, String audienceCertificate) async {
+  //   Database db = await instance.database;
+  //   return await db.update(tokenTable, {'audience_certificate': audienceCertificate},
+  //       where: 'token = ?', whereArgs: [jwtString]);
+  // }
 }

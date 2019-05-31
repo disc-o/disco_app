@@ -4,10 +4,12 @@ import 'dart:math';
 
 export 'package:pointycastle/api.dart';
 import 'package:convert/convert.dart' as conv;
+import 'package:dio/dio.dart';
 import 'package:disco_app/rsa_key_helper.dart';
+import 'package:disco_app/x509_certificate.dart';
 import 'package:encrypt/encrypt.dart';
 import 'package:crypt/crypt.dart';
-import 'package:corsac_jwt/corsac_jwt.dart' as jwt;
+// import 'package:corsac_jwt/corsac_jwt.dart' as jwt;
 
 import 'package:disco_app/data.dart' as data;
 import 'package:pointycastle/pointycastle.dart';
@@ -49,6 +51,10 @@ Future<void> connectRemote() async {
   data.certificateFromClient = recv['certificate'];
 }
 
+String _base64ToBase64Url(String encoded) {
+  return base64UrlEncode(base64Decode(encoded));
+}
+
 class SymmetricEncrypted {
   String keyBase64, ivBase64, encryptedBase64;
   SymmetricEncrypted(this.keyBase64, this.ivBase64, this.encryptedBase64);
@@ -61,7 +67,7 @@ class SymmetricEncrypted {
 
   @override
   String toString() {
-    return "[SymmetricEncrypted]\nkey: $keyBase64\niv:$ivBase64\nencrypted: $encryptedBase64";
+    return "[SymmetricEncrypted]\nkey: ${_base64ToBase64Url(keyBase64)}\niv:${_base64ToBase64Url(ivBase64)}\nencrypted: ${_base64ToBase64Url(encryptedBase64)}";
   }
 }
 
@@ -90,6 +96,13 @@ String decryptAsymmetricallyEncryptedSE(
       SymmetricEncrypted(keyBase64, ivBase64, enc.encryptedBase64));
 }
 
+Future<ParsedX509Certificate> parseCertificate(String pemCert) async {
+  Dio dio = Dio();
+  var resp =
+      await dio.post('http://127.0.0.1:3001/cert', data: {'pem': pemCert});
+  return ParsedX509Certificate.fromJson(resp.data);
+}
+
 main(List<String> args) async {
   var enc = encryptSymmetric('hello');
   print(enc.keyBase64);
@@ -109,4 +122,6 @@ main(List<String> args) async {
   // print(token);
   // var decodedToken = jwt.JWT.parse(token.toString());
   // print(decodedToken.verify(jwt.JWTHmacSha256Signer('asd')));
+
+  // print(await parseCertificate("-----BEGIN CERTIFICATE-----MIICMzCCAZygAwIBAgIJALiPnVsvq8dsMA0GCSqGSIb3DQEBBQUAMFMxCzAJBgNVBAYTAlVTMQwwCgYDVQQIEwNmb28xDDAKBgNVBAcTA2ZvbzEMMAoGA1UEChMDZm9vMQwwCgYDVQQLEwNmb28xDDAKBgNVBAMTA2ZvbzAeFw0xMzAzMTkxNTQwMTlaFw0xODAzMTgxNTQwMTlaMFMxCzAJBgNVBAYTAlVTMQwwCgYDVQQIEwNmb28xDDAKBgNVBAcTA2ZvbzEMMAoGA1UEChMDZm9vMQwwCgYDVQQLEwNmb28xDDAKBgNVBAMTA2ZvbzCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEAzdGfxi9CNbMf1UUcvDQh7MYBOveIHyc0E0KIbhjK5FkCBU4CiZrbfHagaW7ZEcN0tt3EvpbOMxxc/ZQU2WN/s/wPxph0pSfsfFsTKM4RhTWD2v4fgk+xZiKd1p0+L4hTtpwnEw0uXRVd0ki6muwV5y/P+5FHUeldq+pgTcgzuK8CAwEAAaMPMA0wCwYDVR0PBAQDAgLkMA0GCSqGSIb3DQEBBQUAA4GBAJiDAAtY0mQQeuxWdzLRzXmjvdSuL9GoyT3BF/jSnpxz5/58dba8pWenv3pj4P3w5DoOso0rzkZy2jEsEitlVM2mLSbQpMM+MUVQCQoiG6W9xuCFuxSrwPISpAqEAuV4DNoxQKKWmhVv+J0ptMWD25Pnpxeq5sXzghfJnslJlQND-----END CERTIFICATE-----"));
 }

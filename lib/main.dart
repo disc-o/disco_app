@@ -1,8 +1,9 @@
+import 'package:disco_app/views/cert_page.dart';
 import 'package:flutter/material.dart';
 
 import 'package:disco_app/dependency_provider.dart';
 import 'package:disco_app/views/server_page.dart';
-import 'package:disco_app/views/client_page.dart';
+// import 'package:disco_app/views/client_page.dart';
 import 'package:disco_app/views/key_page.dart';
 import 'package:disco_app/views/db_page.dart';
 
@@ -29,8 +30,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   var _currentIndex = 0;
   var _appBarTitle = 'KeyGen';
-  final _pages = [KeyPage(), ServerPage(), ClientPage()];
-  final _titles = ['KeyGen', 'Server', 'Client'];
+  final _pages = [KeyPage(), ServerPage(), CertPage()];
+  final _titles = ['KeyGen', 'Server', 'Certificate'];
 
   BottomNavigationBarItem _navBarItem(IconData icon, String title) {
     return BottomNavigationBarItem(
@@ -88,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
           items: [
             _navBarItem(Icons.vpn_key, 'Key'),
             _navBarItem(Icons.network_check, 'Server'),
-            _navBarItem(Icons.bookmark, 'Client'),
+            _navBarItem(Icons.account_box, 'Cert'),
           ],
         ),
         body: PageView(
