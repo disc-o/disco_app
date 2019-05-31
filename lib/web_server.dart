@@ -119,7 +119,7 @@ Future<AngelHttp> startWebServer(BuildContext context,
     {int port = 3000}) async {
   var app = Angel();
   authServer = _AuthServer(context);
-  var _rgxBearer = RegExp(r'^[Bb]earer');
+  // var _rgxBearer = RegExp(r'^[Bb]earer');
   AngelHttp http;
 
   http = AngelHttp(app);
@@ -170,6 +170,13 @@ Future<AngelHttp> startWebServer(BuildContext context,
   print(t2);
   print(util.decryptAsymmetricallyEncryptedSE(
       t2, rsaHelper, data.keyPair.privateKey));
+  var t3 = util.SymmetricEncrypted.asymEncrypted(
+      util.encryptSymmetric(trustedRegisterInfo),
+      rsaHelper,
+      data.keyPair.publicKey);
+  print(t3);
+  print(util.decryptAsymmetricallyEncryptedSE(
+      t3, rsaHelper, data.keyPair.privateKey));
 
   // above is for testing purposes ---------------
 
@@ -202,28 +209,22 @@ Future<AngelHttp> startWebServer(BuildContext context,
     var state = '';
     var query = req.queryParameters;
     state = query['state']?.toString() ?? '';
+    var key = query['key'];
+    var iv = query['iv'];
+    var encrypted = query['encrypted'];
+    Map<String, dynamic> body;
+    var enc = util.SymmetricEncrypted(key, iv, encrypted);
+    var rawJsonString = util.decryptAsymmetricallyEncryptedSE(
+        enc, rsaHelper, data.keyPair.privateKey);
+    body = jsonDecode(rawJsonString);
+    var authToken = await _getParamFromMap(body, 'access_token', state);
+    var clientId = await _getParamFromMap(body, 'client_id', state);
+    var clientSecret = await _getParamFromMap(body, 'client_secret', state);
+    Client client = await authServer.findClient(clientId);
 
-    /// We don't need to verify the [client_secret] and [client_id] combination
-    /// upon receiving [access_token], and here is the reason why:
-    /// when the user approved issuing this [access_token], he or she grants the
-    /// organization represented by that certificate to have access to his or her
-    /// data. Certificate cannot be counterfeited, thus the user can be sure
-    /// that his data encrypted by the public key contained in that certificate
-    /// can only be decrypted by the owner of that certificate.
-    /// So, upon receiving the [access_token], Disco app looks for which client
-    /// this [access_token] is for, encrypt the data with that client's
-    /// public key. Even if a third-party changed the user's public key and get
-    /// the client's [access_token], because it cannot change
-    /// any part of the certificate, given the user approved data access from
-    /// an entity certified by that correct certificate, the third party (most
-    /// likely the Disco server) cannot decrypt the user's data, making such
-    /// attack meaningless.
-
-    var authToken =
-        req.headers.value('authorization')?.replaceAll(_rgxBearer, '')?.trim();
-    Client client;
-
-    if (authToken == null) {
+    if (authToken == null ||
+        client == null ||
+        await authServer.verifyClient(client, clientSecret)) {
       throw AngelHttpException.forbidden();
     } else {
       var list = await db.DatabaseHelper.instance.selectTokenByJwt(authToken);
@@ -236,8 +237,9 @@ Future<AngelHttp> startWebServer(BuildContext context,
         var tokenRecord = list[0];
         if (_scopeIsKeyB(tokenRecord['scopes'].toString())) {
           // issue Key B
+          if (tokenRecord['client_id'] != clientId)
+            throw AngelHttpException.forbidden();
           if (await invokeUserToIssueKeyB(tokenRecord)) {
-            client = await authServer.findClient(tokenRecord['client_id']);
             var signSecret = util.generateCryptoRandomString();
             var builder = jwt.JWTBuilder();
             var signer = jwt.JWTHmacSha256Signer(signSecret);
@@ -261,15 +263,23 @@ Future<AngelHttp> startWebServer(BuildContext context,
                     'client_id'], // this is strange but keep it this way for now
                 scopeString,
                 expireDuration.inSeconds);
+            var content = jsonEncode({
+              'access_token': signedJwt,
+              'token_type': 'bearer',
+              'expires_in': expireDuration.inSeconds,
+              'scope': scopeString
+            });
+            var se = util.encryptSymmetric(content);
+            var enc = util.SymmetricEncrypted.asymEncrypted(se, rsaHelper,
+                rsaHelper.parsePublicKeyFromPem(client.publicKey));
             res
               ..contentType =
                   MediaType('application', 'json', {'charset': 'utf-8'})
-              ..write(jsonEncode({
-                'access_token': signedJwt,
-                'token_type': 'bearer',
-                'expires_in': expireDuration.inSeconds,
-                'scope': scopeString
-              }));
+              ..write({
+                'key': enc.keyBase64,
+                'iv': enc.ivBase64,
+                'encrypted': enc.encryptedBase64
+              });
           } else {
             throw oauth2.AuthorizationException(
               oauth2.ErrorResponse(oauth2.ErrorResponse.unauthorizedClient,
@@ -516,7 +526,7 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       bool implicit) async {
     if (implicit) {
       var query = req.queryParameters;
-      state = query['state']?.toString() ?? '';
+      // state = query['state']?.toString() ?? '';
       var key = query['key'];
       var iv = query['iv'];
       var encrypted = query['encrypted'];
@@ -564,15 +574,25 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
           // res..redirect(uri);
           // print(uri);
           // res..json({uri: uri});
+
+          var content = jsonEncode({
+            'access_token': signedJwt,
+            'token_type': 'bearer',
+            'expires_in': expireDuration.inSeconds,
+            'scope': scopes
+          });
+          var se = util.encryptSymmetric(content);
+          var enc = util.SymmetricEncrypted.asymEncrypted(
+              se, rsaHelper, rsaHelper.parsePublicKeyFromPem(client.publicKey));
+
           res
             ..contentType =
                 MediaType('application', 'json', {'charset': 'utf-8'})
-            ..write(jsonEncode({
-              'access_token': signedJwt,
-              'token_type': 'bearer',
-              'expires_in': expireDuration.inSeconds,
-              'scope': scopes
-            }));
+            ..write({
+              'key': enc.keyBase64,
+              'iv': enc.ivBase64,
+              'encrypted': enc.encryptedBase64
+            });
         } else {
           throw oauth2.AuthorizationException(
             oauth2.ErrorResponse(oauth2.ErrorResponse.unauthorizedClient,

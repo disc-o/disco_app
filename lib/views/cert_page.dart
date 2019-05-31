@@ -4,8 +4,8 @@ import 'package:disco_app/util.dart' as prefix0;
 import 'package:disco_app/views/certificate_detail_page.dart';
 import 'package:disco_app/web_server.dart';
 import 'package:flutter/material.dart';
-import 'package:disco_app/database_helper.dart' as db;
-import 'package:disco_app/widgets/drawer.dart' as drawer;
+// import 'package:disco_app/database_helper.dart' as db;
+// import 'package:disco_app/widgets/drawer.dart' as drawer;
 import 'package:disco_app/util.dart' as util;
 import 'package:disco_app/data.dart' as data;
 

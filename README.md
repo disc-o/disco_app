@@ -291,13 +291,7 @@ Note that the key is encoded and signed in [JSON Web Tokens](jwt.io) format so t
 }
 ```
 
-If I accepted the *key B* request, IKEA would receive a JSON response with its request key inside. A sample response is as follows:
-
-```json
-{
-    "key": "
-}
-```
+If I accepted the *key B* request, IKEA would receive a JSON response with its request key inside. Of course, because of the end-to-end encryption, the raw response is contains `key` and `iv` which are encrypted with IKEA's public key and a `encrypted` which an encrypted JSON string using `key` and `iv`. A sample decrypted and parsed response is as follows:
 
 ```json
 {
@@ -314,4 +308,48 @@ Then IKEA sends this JSON to Singpost.
 
 #### Step 3: *Trusted Client* get the actual data
 
-// add later
+By now you should be familiar with how end-to-end encryption works, remember whenever sends a message to me, Singpost would first stringify its JSON and encrypt it with AES and send me the encrypted `key` and `iv` using my public key, along with `encrypted`; whenever I send a message to Singpost, I would do the same using the public key from Singpost's certificate
+
+The registration process is exactly the same as IKEA's. The only difference is that Singpost requests for a *trusted client* privilege:
+
+```json
+{
+    "state": "a random string",
+    "client_id": "Singpost's ID",
+    "client_secret": "secret",
+    "client_name": "Singpost",
+    "is_trusted": true,
+    "certificate": data.sampleCertificate,
+    "challenge": "decrypted encrypted c"
+}
+```
+
+Requesting for data is exactly the same as how IKEA request for *key B*, a sample request JSON is as follows:
+
+```json
+{
+    "access_token": "key B obtained from IKEA",
+    "client_id": "IKEA's ID",
+    "client_secret": "secret",
+    "response_type": "token",
+    "redirect_uri": "https://singpost.sg/redirect",
+    "scope": "address",
+    "audience": "Singpost",
+}
+```
+
+If I approve this request, Singpost would receive my information in JSON format (encrypted with Singpost's public key of course):
+
+```json
+{
+    "address": "my address"
+}
+```
+
+## Limitations
+
+1. Since *user* doesn't have the ability to own a CA-signed certificate, Disco server cannot make sure information sent from *client* is safe. However, our system aims to protect *user*'s privacy, not the *client*'s, this is an unavoidable flaw that doesn't matter much.
+2. Currently we don't have a [localtunnel](https://localtunnel.github.io/www/) or similar tunneling client written in Dart, so this app can only run on emulators where we can forward `localhost:3000` of the emulator to `localhost:3000` of our computer, then on the computer, create a tunnel from `localhost:3000` to localtunnel's server.
+3. Currently we don't have a complete PKI utility library written in Dart. Specifically we can't parse X.509 certificate encoded in PEM within our app, so I integrated this function to [Disco server](https://github.com/disc-o/server) under POST request of `/cert` route.
+
+Clearly limitation 2 and 3 can be solved by porting the standard implementations, which takes time.

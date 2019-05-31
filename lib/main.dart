@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'package:disco_app/dependency_provider.dart';
 import 'package:disco_app/views/server_page.dart';
-import 'package:disco_app/views/client_page.dart';
+// import 'package:disco_app/views/client_page.dart';
 import 'package:disco_app/views/key_page.dart';
 import 'package:disco_app/views/db_page.dart';
 
