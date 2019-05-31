@@ -254,7 +254,7 @@ If I accepted the *key A* request, IKEA would receive a JSON response with its r
 }
 ```
 
-Note that the key is encoded and signed in [JSON Web Tokens](jwt.io) format so that we can make sure the scope, audience, expire time, everything about our token is not changed by anyone because we signed the token using a key known only to us. You may refer to the website for more information.
+Note that the key is encoded and signed in [JSON Web Tokens](jwt.io) format so that we can make sure the scope, audience, expire time, everything about our token is not changed by anyone because we signed the token using a key known only to us. You may refer to the website for more information. Also, according to [this answer on Stackoverflow](https://stackoverflow.com/questions/417142/what-is-the-maximum-length-of-a-url-in-different-browsers), our URL *should* be within the 2000 character limit. However we're dealing with servers instead of browsers so even if it exceeded the length limit it should be no problem....
 
 #### Step 2: Request and transfer *Key B*
 
