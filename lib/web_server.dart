@@ -136,6 +136,7 @@ Future<AngelHttp> startWebServer(BuildContext context,
     "client_secret": "secret",
     "client_name": "IKEA",
     "is_trusted": false,
+    "certificate": data.sampleCertificate,
     "challenge": "decrypted encrypted c"
   });
   var my2 = jsonEncode({
@@ -371,6 +372,8 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
           await _getParamFromMap(body, 'is_trusted', state) == 'true'
               ? true
               : false;
+      var cert = await _getParamFromMap(body, 'certificate', state);
+      var pk = (await util.parseCertificate(cert)).publicKey;
       bool isCertified = await checkCertificate(req, body);
       // await req.parseBody();
       bool accepted = await openRegisterVerificationDrawer(
@@ -379,8 +382,8 @@ class _AuthServer extends oauth2.AuthorizationServer<Client, User> {
       if (accepted) {
         String saltedPassword = util.addSalt(clientSecret);
         // print(util.matchedPassword(clientSecret, saltedPassword));
-        db.DatabaseHelper.instance
-            .insertClient(clientId, clientName, saltedPassword, isTrusted);
+        db.DatabaseHelper.instance.insertClient(
+            clientId, clientName, saltedPassword, isTrusted, cert, pk);
       } else {
         throw AuthorizationException(ErrorResponse(
           ErrorResponse.unauthorizedClient,

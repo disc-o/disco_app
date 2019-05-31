@@ -1,4 +1,6 @@
+import 'package:disco_app/util.dart';
 import 'package:flutter/material.dart';
+import 'package:disco_app/data.dart' as data;
 import 'package:disco_app/database_helper.dart' as db;
 
 class _ClientData {
@@ -102,7 +104,12 @@ class _ClientPageState extends State<ClientPage>
                     if (this._formKey.currentState.validate()) {
                       _formKey.currentState.save();
                       print(await db.DatabaseHelper.instance.insertClient(
-                          _data.id, _data.name, _data.secret, _data.isTrusted));
+                          _data.id,
+                          _data.name,
+                          _data.secret,
+                          _data.isTrusted,
+                          data.sampleCertificate,
+                          data.samplePublicKey));
                       // openVerificationDrawer(context, _data.name, _data.secret);
                     }
                   },

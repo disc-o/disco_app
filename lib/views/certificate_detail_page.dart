@@ -26,6 +26,9 @@ class CertificateDetailPage extends StatelessWidget {
         children: <Widget>[
           _getTile('Issuer', cert.issuer.toJson().toString()),
           _getTile('Serial Number', cert.serialNumber),
+          _getTile('Subject', cert.subject.toJson().toString()),
+          _getTile('Validity', cert.validity.toJson().toString()),
+          _getTile('Public Key', cert.publicKey),
         ],
       )),
     );
