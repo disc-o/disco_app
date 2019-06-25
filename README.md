@@ -125,8 +125,8 @@ Also, I assume the root domain of Disco server is `https://dis.co`
 ```
 
 By providing a `public_key`, I don't need to trust Disco server's tunnel service
-- Later IKEA will encrypt its `client_id` and `client_secret` using my public key so that even if Disco server wants to steal IKEA's id and secret, it can't read it as plaintext
-- When IKEA wants to exchange its `client_id`, `client_secret` and *key A* for *key B*, it will encode these information in a JSON string, encrypt it using my public key. Since Disco server doesn't have IKEA's id and secret as plaintext, it can does nothing but honestly pass the data without changing a byte because changing any information would result in an unreadable response received by me, which I will of course reject.
+- Note that by performing a men-in-the-middle attack, Disco's server can steal IKEA's `client_id` and `client_secret`. 
+- However, when IKEA wants to exchange its `client_id`, `client_secret` and *key A* for *key B*, it will encode these information in a JSON string, encrypt it using my public key. Since Disco server doesn't have IKEA's id and secret as plaintext, it can does nothing but honestly pass the data without changing a byte because changing any information would result in an unreadable response received by me, which I will of course reject.
 
 5. Disco server receives the POST request from me, it will do these things:
 
